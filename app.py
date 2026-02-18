@@ -111,8 +111,8 @@ def fetch_release_snapshot():
                 sm = s.pct_change() * 100
                 last_val, prev_val = round(sm.iloc[-1], 2), round(sm.iloc[-2], 2)
             elif calc == "diff":
-                last_val = round(s.diff().iloc[-1], 1)
-                prev_val = round(s.diff().iloc[-2], 1)
+                last_val = round(s.diff().iloc[-1], 2)
+                prev_val = round(s.diff().iloc[-2], 2)
             else:
                 last_val, prev_val = round(last_val, 2), round(prev_val, 2)
             next_date = "—"
@@ -537,11 +537,11 @@ with tab3:
                 fig_rv.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
-        fig_rv.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_rv.update_layout(
             title=chart_title("Real Yield & Breakeven Inflation",
                               "Real yield = 10Y TIPS · Breakeven = market-implied inflation"),
             template="plotly_white", height=420, yaxis_title="%",
+            yaxis=dict(rangemode="normal", autorange=True),
             margin=CM, legend=LEG, dragmode=False,
             annotations=[src_ann()]
         )
