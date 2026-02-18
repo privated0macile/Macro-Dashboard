@@ -31,7 +31,7 @@ fred        = fredapi.Fred(api_key=FRED_KEY)
 # ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 START = "2015-01-01"
 BENCH = "SPY"
-ROLL  = 126  # 6-month rolling window
+ROLL  = 126
 
 FACTORS = {
     "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size",
@@ -46,7 +46,6 @@ SECTORS = {
 YIELDS  = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
 
-# FOMC meeting dates — update annually
 FOMC = {
     "2025": [
         ("Jan 28–29", "2025-01-29"), ("Mar 18–19", "2025-03-19"),
@@ -114,7 +113,7 @@ def reindex_from(df, base_date):
     df = df[df.index >= pd.Timestamp(base_date)]
     return df / df.iloc[0]
 
-def yield_curve_fig():
+def build_yield_curve():
     maturities = {
         "DGS1MO": "1M", "DGS3MO": "3M", "DGS6MO": "6M",
         "DGS1": "1Y", "DGS2": "2Y", "DGS5": "5Y",
@@ -151,14 +150,13 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 
 with tab1:
     st.subheader("Key Indicators")
-
     c = st.columns(6)
     snapshot = [
         ("DGS2",      "2Y Treasury",    True,  "%"),
         ("DGS10",     "10Y Treasury",   True,  "%"),
         ("DGS30",     "30Y Treasury",   True,  "%"),
         ("FEDFUNDS",  "Fed Funds Rate", False, "%"),
-        ("CPIAUCSL",  "CPI YoY",        True,  "%"),   # converted below
+        ("CPIAUCSL",  "CPI YoY",        True,  "%"),
         ("T10Y2Y",    "10Y–2Y Spread",  True,  "%"),
     ]
     for i, (sid, label, show_delta, unit) in enumerate(snapshot):
@@ -174,7 +172,7 @@ with tab1:
     col_l, col_r = st.columns(2)
 
     with col_l:
-        st.plotly_chart(yield_curve_fig(), use_container_width=True)
+        st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_overview")
 
     with col_r:
         st.subheader("Upcoming Releases")
@@ -184,11 +182,13 @@ with tab1:
             upcoming = cal[cal["time"] >= today_ts].head(10)
             if not upcoming.empty:
                 disp = upcoming.copy()
-                disp["Date"]  = disp["time"].dt.strftime("%b %d")
+                disp["Date"] = disp["time"].dt.strftime("%b %d")
                 disp = disp.rename(columns={"event": "Event", "estimate": "Est.",
                                              "prev": "Prev", "actual": "Actual"})
                 st.dataframe(disp[["Date", "Event", "Prev", "Est.", "Actual"]],
                              hide_index=True, use_container_width=True)
+            else:
+                st.info("No upcoming releases found.")
         except Exception:
             st.info("Calendar unavailable.")
 
@@ -237,13 +237,13 @@ with tab2:
     fig_f.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
     fig_f.update_layout(template="plotly_white", height=580,
                         legend=dict(orientation="h", y=-0.15))
-    st.plotly_chart(fig_f, use_container_width=True)
+    st.plotly_chart(fig_f, use_container_width=True, key="fig_factors")
 
     st.divider()
 
     # ── Sectors ──
     st.subheader("Sector ETF Performance vs S&P 500")
-    ps   = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
+    ps     = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
     base_s = period_opts[ps] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
     rel_s, alpha_s = compute_relative(prices, SECTORS)
@@ -267,18 +267,17 @@ with tab2:
     fig_s.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
     fig_s.update_layout(template="plotly_white", height=760,
                         legend=dict(orientation="h", y=-0.1))
-    st.plotly_chart(fig_s, use_container_width=True)
+    st.plotly_chart(fig_s, use_container_width=True, key="fig_sectors")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — RATES
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab3:
-    rp    = st.radio("Period", ["1Y", "3Y", "5Y", "10Y", "Full"], horizontal=True)
+    rp    = st.radio("Period", ["1Y", "3Y", "5Y", "10Y", "Full"], horizontal=True, key="rp")
     rmons = {"1Y": 12, "3Y": 36, "5Y": 60, "10Y": 120, "Full": None}[rp]
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
 
-    # Treasury yield lines
     st.subheader("Treasury Yields by Maturity")
     fig_y = go.Figure()
     for i, (sid, lbl) in enumerate(YIELDS.items()):
@@ -289,7 +288,7 @@ with tab3:
         except Exception:
             pass
     fig_y.update_layout(template="plotly_white", height=380, yaxis_title="Yield (%)")
-    st.plotly_chart(fig_y, use_container_width=True)
+    st.plotly_chart(fig_y, use_container_width=True, key="fig_yields")
 
     col1, col2 = st.columns(2)
 
@@ -304,7 +303,7 @@ with tab3:
                 pass
         fig_sp.add_hline(y=0, line_dash="dash", line_color="red", line_width=1)
         fig_sp.update_layout(template="plotly_white", height=360, yaxis_title="Spread (%)")
-        st.plotly_chart(fig_sp, use_container_width=True)
+        st.plotly_chart(fig_sp, use_container_width=True, key="fig_spreads")
 
     with col2:
         st.subheader("Real Yield & Breakeven Inflation")
@@ -317,9 +316,9 @@ with tab3:
                 pass
         fig_rv.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_rv.update_layout(template="plotly_white", height=360, yaxis_title="%")
-        st.plotly_chart(fig_rv, use_container_width=True)
+        st.plotly_chart(fig_rv, use_container_width=True, key="fig_realyield")
 
-    st.plotly_chart(yield_curve_fig(), use_container_width=True)
+    st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_rates")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — MACRO
@@ -343,7 +342,7 @@ with tab4:
         fig_cpi.add_hline(y=2.0, line_dash="dash", line_color="red",
                           annotation_text="Fed 2% target", annotation_position="bottom right")
         fig_cpi.update_layout(template="plotly_white", height=360, yaxis_title="YoY %")
-        st.plotly_chart(fig_cpi, use_container_width=True)
+        st.plotly_chart(fig_cpi, use_container_width=True, key="fig_cpi")
 
     with col_b:
         st.subheader("PCE & Core PCE (YoY %)")
@@ -357,7 +356,7 @@ with tab4:
         fig_pce.add_hline(y=2.0, line_dash="dash", line_color="red",
                           annotation_text="Fed 2% target", annotation_position="bottom right")
         fig_pce.update_layout(template="plotly_white", height=360, yaxis_title="YoY %")
-        st.plotly_chart(fig_pce, use_container_width=True)
+        st.plotly_chart(fig_pce, use_container_width=True, key="fig_pce")
 
     col_c, col_d = st.columns(2)
 
@@ -373,12 +372,11 @@ with tab4:
             except Exception:
                 pass
         fig_ff.update_layout(template="plotly_white", height=360, yaxis_title="%")
-        st.plotly_chart(fig_ff, use_container_width=True)
+        st.plotly_chart(fig_ff, use_container_width=True, key="fig_fedfunds")
 
     with col_d:
         st.subheader("Real GDP Growth (QoQ Annualized %)")
         try:
-            # A191RL1Q225SBEA = real GDP growth rate, SAAR
             gdp = trim(fetch_fred("A191RL1Q225SBEA"), mmon)
             fig_gdp = go.Figure()
             fig_gdp.add_trace(go.Bar(
@@ -387,7 +385,7 @@ with tab4:
             ))
             fig_gdp.add_hline(y=0, line_color="black", line_width=1)
             fig_gdp.update_layout(template="plotly_white", height=360, yaxis_title="% QoQ Ann.")
-            st.plotly_chart(fig_gdp, use_container_width=True)
+            st.plotly_chart(fig_gdp, use_container_width=True, key="fig_gdp")
         except Exception:
             st.info("GDP data unavailable.")
 
@@ -410,7 +408,7 @@ with tab5:
                     if row["time"].normalize() == today_ts:
                         return ["background-color: #fff3cd"] * len(row)
                     if row["time"] < today_ts:
-                        return ["color: #aaaaaa"]        * len(row)
+                        return ["color: #aaaaaa"] * len(row)
                     return [""] * len(row)
 
                 disp = cal.copy()
@@ -435,8 +433,8 @@ with tab5:
         for year, meetings in FOMC.items():
             st.caption(f"**{year}**")
             for lbl, d in meetings:
-                mtg_d  = datetime.strptime(d, "%Y-%m-%d").date()
-                days   = (mtg_d - today_d).days
+                mtg_d = datetime.strptime(d, "%Y-%m-%d").date()
+                days  = (mtg_d - today_d).days
                 if days > 0:
                     st.markdown(f"🔵 **{lbl}** — *{days}d*")
                 elif days == 0:
