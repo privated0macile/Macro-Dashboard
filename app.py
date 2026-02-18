@@ -31,9 +31,11 @@ START = "2015-01-01"
 BENCH = "SPY"
 ROLL  = 126
 
-# Standard layout defaults
-CM     = dict(b=110, t=60, l=60, r=40)   # chart margins — extra bottom for legend + source
-LEG    = dict(orientation="h", yanchor="top", y=-0.22, x=0.5, xanchor="center")
+# Standard margins and legend — extra bottom for legend + source clearance
+CM  = dict(b=120, t=60, l=60, r=40)
+LEG = dict(orientation="h", yanchor="top", y=-0.25, x=0.5, xanchor="center")
+# Plotly config — disable toolbar/drag, keep hover
+PCFG = dict(displayModeBar=False, scrollZoom=False)
 
 FACTORS = {
     "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size",
@@ -180,15 +182,7 @@ def reindex_from(df, base_date):
     df = df[df.index >= pd.Timestamp(base_date)]
     return df / df.iloc[0]
 
-def src_ann():
-    return dict(
-        text="<i>Source: FRED / Yahoo Finance</i>",
-        xref="paper", yref="paper",
-        x=1.0, y=-0.28, showarrow=False,
-        font=dict(size=10, color="#888888"), xanchor="right"
-    )
-
-def src_ann_sub(y):
+def src_ann(y=-0.30):
     return dict(
         text="<i>Source: FRED / Yahoo Finance</i>",
         xref="paper", yref="paper",
@@ -231,40 +225,59 @@ def build_yield_curve():
             pass
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=labels, y=vals, mode="lines+markers",
-                             line=dict(color="#1f77b4", width=2.5), marker=dict(size=8)))
+                             line=dict(color="#1f77b4", width=2.5), marker=dict(size=8),
+                             showlegend=False))
     fig.update_layout(
         title=chart_title("Current Yield Curve", "Spot rates 1M–30Y as of latest FRED data"),
         template="plotly_white", height=400,
         yaxis_title="Yield (%)", xaxis_title="Maturity",
-        margin=CM, legend=LEG, annotations=[src_ann()]
+        margin=dict(b=70, t=60, l=60, r=40),
+        dragmode=False,
+        annotations=[src_ann(-0.18)]
     )
     return fig
 
-def credit_table_html(hy_oas, hy_prev, ig_oas, ig_prev, t10):
+def credit_spread_df():
+    """Return credit spread data as a formatted DataFrame."""
+    hy_s  = fetch_fred_series("BAMLH0A0HYM2")
+    ig_s  = fetch_fred_series("BAMLC0A0CM")
+    t10_s = fetch_fred_series("DGS10")
+    hy_oas, hy_prev = hy_s.iloc[-1], hy_s.iloc[-2]
+    ig_oas, ig_prev = ig_s.iloc[-1], ig_s.iloc[-2]
+    t10 = t10_s.iloc[-1]
     gap, gap_prev = hy_oas - ig_oas, hy_prev - ig_prev
-    rows_data = [
-        ("HY OAS",    f"{hy_oas*100:.0f} bps",    (hy_oas - hy_prev)*100),
-        ("HY Yield",  f"{(hy_oas+t10):.2f}%",     (hy_oas - hy_prev)*100),
-        ("IG OAS",    f"{ig_oas*100:.0f} bps",     (ig_oas - ig_prev)*100),
-        ("IG Yield",  f"{(ig_oas+t10):.2f}%",      (ig_oas - ig_prev)*100),
-        ("HY–IG Gap", f"{gap*100:.0f} bps",        (gap - gap_prev)*100),
+    rows = [
+        ("HY OAS",    f"{hy_oas*100:.0f} bps",  f"{(hy_oas-hy_prev)*100:+.0f} bps DoD"),
+        ("HY Yield",  f"{(hy_oas+t10):.2f}%",   f"{(hy_oas-hy_prev)*100:+.0f} bps DoD"),
+        ("IG OAS",    f"{ig_oas*100:.0f} bps",   f"{(ig_oas-ig_prev)*100:+.0f} bps DoD"),
+        ("IG Yield",  f"{(ig_oas+t10):.2f}%",    f"{(ig_oas-ig_prev)*100:+.0f} bps DoD"),
+        ("HY–IG Gap", f"{gap*100:.0f} bps",      f"{(gap-gap_prev)*100:+.0f} bps DoD"),
     ]
-    html = "<table style='width:100%;border-collapse:collapse;margin-top:6px'>"
-    for label, value, delta in rows_data:
-        color = "#2ca02c" if delta > 0 else "#d62728" if delta < 0 else "#888"
-        arrow = "▲" if delta > 0 else "▼" if delta < 0 else "–"
-        sign  = "+" if delta > 0 else ""
-        html += (
-            f"<tr style='border-bottom:1px solid #f0f0f0'>"
-            f"<td style='color:#555;font-size:11px;padding:5px 6px 5px 0'>{label}</td>"
-            f"<td style='font-size:13px;font-weight:600;padding:5px 8px'>{value}</td>"
-            f"<td style='font-size:10px;color:{color};padding:5px 0'>"
-            f"{arrow} {sign}{delta:.0f} bps DoD</td>"
-            f"</tr>"
-        )
-    html += "</table>"
-    html += "<p style='font-size:10px;color:#aaa;margin:6px 0 0 0'>Yield ≈ OAS + 10Y Treasury</p>"
-    return html
+    df = pd.DataFrame(rows, columns=["", "Value", "DoD"])
+    return df, hy_oas, hy_prev, ig_oas, ig_prev, gap, gap_prev
+
+def snap_color(row):
+    styles = [""] * len(row)
+    try:
+        cols = list(row.index)
+        l, p = float(row["Latest"]), float(row["Previous"])
+        idx  = cols.index("Latest")
+        styles[idx] = ("color: #2ca02c; font-weight:bold" if l > p
+                       else "color: #d62728; font-weight:bold" if l < p else "")
+    except Exception:
+        pass
+    return styles
+
+def cred_color(row):
+    styles = ["", "", ""]
+    try:
+        val = row["DoD"]
+        num = float(val.replace("bps DoD", "").replace("+", "").strip())
+        color = "#2ca02c" if num > 0 else "#d62728" if num < 0 else "#888"
+        styles[2] = f"color:{color}"
+    except Exception:
+        pass
+    return styles
 
 # ─── PAGE HEADER ───────────────────────────────────────────────────────────────
 
@@ -307,24 +320,20 @@ with tab1:
     with cred_col:
         st.subheader("Credit Spreads")
         try:
-            hy_s  = fetch_fred_series("BAMLH0A0HYM2")
-            ig_s  = fetch_fred_series("BAMLC0A0CM")
-            t10_s = fetch_fred_series("DGS10")
-            st.markdown(
-                credit_table_html(
-                    hy_s.iloc[-1], hy_s.iloc[-2],
-                    ig_s.iloc[-1], ig_s.iloc[-2],
-                    t10_s.iloc[-1]
-                ),
-                unsafe_allow_html=True
+            df_cr, *_ = credit_spread_df()
+            st.dataframe(
+                df_cr.style.apply(cred_color, axis=1),
+                hide_index=True, use_container_width=True, height=215
             )
+            st.caption("Yield ≈ OAS + 10Y Treasury")
         except Exception:
             st.info("Credit data unavailable.")
 
     st.divider()
     col_l, col_r = st.columns(2)
     with col_l:
-        st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_overview")
+        st.plotly_chart(build_yield_curve(), use_container_width=True,
+                        key="yc_overview", config=PCFG)
         c = yield_curve_commentary()
         if c: st.caption(c)
     with col_r:
@@ -361,7 +370,6 @@ with tab2:
     }
 
     # ── Factors ──
-    st.subheader("MSCI Factors vs S&P 500")
     pf   = st.radio("Period", list(period_opts.keys()), horizontal=True, key="pf")
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
@@ -369,35 +377,39 @@ with tab2:
     ri_f = reindex_from(rel_f, base)
     al_f = alpha_f[alpha_f.index >= pd.Timestamp(base)]
 
-    fig_f = make_subplots(rows=2, cols=1, shared_xaxes=False, vertical_spacing=0.18,
-                          subplot_titles=[
-                              chart_title("Relative Performance vs SPY",
-                                          "ETF ÷ SPY, indexed to 1.0 · above 1.0 = outperforming"),
-                              chart_title("Rolling 6-Month Alpha",
-                                          "Compounded 126-day return of relative series · positive = outperforming")
-                          ])
+    # Chart 1: Factor relative performance
+    fig_f1 = go.Figure()
     for tkr, name in FACTORS.items():
         if tkr in ri_f.columns:
-            fig_f.add_trace(go.Scatter(x=ri_f.index, y=ri_f[tkr], name=name, mode="lines"), row=1, col=1)
-        if tkr in al_f.columns:
-            fig_f.add_trace(go.Scatter(x=al_f.index, y=al_f[tkr], name=name, mode="lines",
-                                       showlegend=False), row=2, col=1)
-    fig_f.add_hline(y=1.0, line_dash="dash", line_color="gray", row=1, col=1)
-    fig_f.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
-    for r in [1, 2]:
-        fig_f.update_xaxes(showticklabels=True, row=r, col=1)
-    fig_f.update_layout(
-        template="plotly_white", height=680,
-        legend=dict(orientation="h", yanchor="top", y=-0.10, x=0.5, xanchor="center"),
-        margin=dict(b=120, t=60, l=60, r=40),
-        annotations=[src_ann_sub(-0.15)]
+            fig_f1.add_trace(go.Scatter(x=ri_f.index, y=ri_f[tkr], name=name, mode="lines"))
+    fig_f1.add_hline(y=1.0, line_dash="dash", line_color="gray")
+    fig_f1.update_layout(
+        title=chart_title("MSCI Factor Relative Performance",
+                          "ETF ÷ SPY, indexed to 1.0 · above 1.0 = outperforming"),
+        template="plotly_white", height=420,
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
     )
-    st.plotly_chart(fig_f, use_container_width=True, key="fig_factors")
+    st.plotly_chart(fig_f1, use_container_width=True, key="fig_f1", config=PCFG)
+
+    # Chart 2: Factor rolling alpha
+    fig_f2 = go.Figure()
+    for tkr, name in FACTORS.items():
+        if tkr in al_f.columns:
+            fig_f2.add_trace(go.Scatter(x=al_f.index, y=al_f[tkr], name=name, mode="lines"))
+    fig_f2.add_hline(y=0.0, line_dash="dash", line_color="gray")
+    fig_f2.update_layout(
+        title=chart_title("MSCI Factor Rolling 6-Month Alpha",
+                          "Compounded 126-day return of relative series · positive = outperforming"),
+        template="plotly_white", height=420,
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
+    )
+    st.plotly_chart(fig_f2, use_container_width=True, key="fig_f2", config=PCFG)
 
     st.divider()
 
     # ── Sectors ──
-    st.subheader("Sector ETFs vs S&P 500")
     ps     = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
     base_s = period_opts[ps] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
@@ -416,38 +428,61 @@ with tab2:
         )))
     )
 
-    fig_s = make_subplots(rows=4, cols=1, shared_xaxes=False, vertical_spacing=0.1,
-                          subplot_titles=[
-                              chart_title("Relative Performance vs SPY",
-                                          "ETF ÷ SPY, indexed to 1.0 at start"),
-                              chart_title("Rolling 6-Month Alpha",
-                                          "Compounded 126-day return of relative series"),
-                              chart_title("Cross-Sectional Dispersion",
-                                          "max − min of relative prices · higher = more between-sector divergence"),
-                              chart_title("Avg Pairwise Sector Correlation (21-day)",
-                                          "Higher = macro-driven · lower = sector-specific moves")
-                          ])
+    # Chart 3: Sector relative performance
+    fig_s1 = go.Figure()
     for tkr, name in SECTORS.items():
         if tkr in ri_s.columns:
-            fig_s.add_trace(go.Scatter(x=ri_s.index, y=ri_s[tkr], name=name, mode="lines"), row=1, col=1)
-        if tkr in al_s.columns:
-            fig_s.add_trace(go.Scatter(x=al_s.index, y=al_s[tkr], name=name, mode="lines",
-                                       showlegend=False), row=2, col=1)
-    fig_s.add_trace(go.Scatter(x=disp.index, y=disp, mode="lines", showlegend=False,
-                               line=dict(color="#555", width=2)), row=3, col=1)
-    fig_s.add_trace(go.Scatter(x=roll_corr.index, y=roll_corr.values, mode="lines", showlegend=False,
-                               line=dict(color="#e377c2", width=2)), row=4, col=1)
-    fig_s.add_hline(y=1.0, line_dash="dash", line_color="gray", row=1, col=1)
-    fig_s.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
-    for r in [1, 2, 3, 4]:
-        fig_s.update_xaxes(showticklabels=True, row=r, col=1)
-    fig_s.update_layout(
-        template="plotly_white", height=1100,
-        legend=dict(orientation="h", yanchor="top", y=-0.04, x=0.5, xanchor="center"),
-        margin=dict(b=130, t=60, l=60, r=40),
-        annotations=[src_ann_sub(-0.07)]
+            fig_s1.add_trace(go.Scatter(x=ri_s.index, y=ri_s[tkr], name=name, mode="lines"))
+    fig_s1.add_hline(y=1.0, line_dash="dash", line_color="gray")
+    fig_s1.update_layout(
+        title=chart_title("Sector ETF Relative Performance",
+                          "ETF ÷ SPY, indexed to 1.0 at start · above 1.0 = outperforming"),
+        template="plotly_white", height=420,
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
     )
-    st.plotly_chart(fig_s, use_container_width=True, key="fig_sectors")
+    st.plotly_chart(fig_s1, use_container_width=True, key="fig_s1", config=PCFG)
+
+    # Chart 4: Sector rolling alpha
+    fig_s2 = go.Figure()
+    for tkr, name in SECTORS.items():
+        if tkr in al_s.columns:
+            fig_s2.add_trace(go.Scatter(x=al_s.index, y=al_s[tkr], name=name, mode="lines"))
+    fig_s2.add_hline(y=0.0, line_dash="dash", line_color="gray")
+    fig_s2.update_layout(
+        title=chart_title("Sector ETF Rolling 6-Month Alpha",
+                          "Compounded 126-day return of relative series"),
+        template="plotly_white", height=420,
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
+    )
+    st.plotly_chart(fig_s2, use_container_width=True, key="fig_s2", config=PCFG)
+
+    # Chart 5: Dispersion
+    fig_s3 = go.Figure()
+    fig_s3.add_trace(go.Scatter(x=disp.index, y=disp, mode="lines",
+                                line=dict(color="#555", width=2), showlegend=False))
+    fig_s3.update_layout(
+        title=chart_title("Cross-Sectional Dispersion",
+                          "max − min of relative prices · higher = more between-sector divergence"),
+        template="plotly_white", height=360,
+        margin=dict(b=70, t=60, l=60, r=40), dragmode=False,
+        annotations=[src_ann(-0.18)]
+    )
+    st.plotly_chart(fig_s3, use_container_width=True, key="fig_s3", config=PCFG)
+
+    # Chart 6: Avg pairwise correlation
+    fig_s4 = go.Figure()
+    fig_s4.add_trace(go.Scatter(x=roll_corr.index, y=roll_corr.values, mode="lines",
+                                line=dict(color="#e377c2", width=2), showlegend=False))
+    fig_s4.update_layout(
+        title=chart_title("Avg Pairwise Sector Correlation (21-day)",
+                          "Higher = sectors moving together (macro-driven) · lower = sector-specific moves"),
+        template="plotly_white", height=360,
+        margin=dict(b=70, t=60, l=60, r=40), dragmode=False,
+        annotations=[src_ann(-0.18)]
+    )
+    st.plotly_chart(fig_s4, use_container_width=True, key="fig_s4", config=PCFG)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — RATES
@@ -470,9 +505,10 @@ with tab3:
         title=chart_title("Treasury Yields by Maturity",
                           "Daily constant-maturity yields — absolute rate levels"),
         template="plotly_white", height=420, yaxis_title="Yield (%)",
-        margin=CM, legend=LEG, annotations=[src_ann()]
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
     )
-    st.plotly_chart(fig_y, use_container_width=True, key="fig_yields")
+    st.plotly_chart(fig_y, use_container_width=True, key="fig_yields", config=PCFG)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -488,9 +524,10 @@ with tab3:
             title=chart_title("Yield Curve Spreads",
                               "10Y–2Y: recession signal · below 0 = inverted"),
             template="plotly_white", height=420, yaxis_title="Spread (%)",
-            margin=CM, legend=LEG, annotations=[src_ann()]
+            margin=CM, legend=LEG, dragmode=False,
+            annotations=[src_ann()]
         )
-        st.plotly_chart(fig_sp, use_container_width=True, key="fig_spreads")
+        st.plotly_chart(fig_sp, use_container_width=True, key="fig_spreads", config=PCFG)
 
     with col2:
         fig_rv = go.Figure()
@@ -505,13 +542,16 @@ with tab3:
             title=chart_title("Real Yield & Breakeven Inflation",
                               "Real yield = 10Y TIPS · Breakeven = market-implied inflation"),
             template="plotly_white", height=420, yaxis_title="%",
-            margin=CM, legend=LEG, annotations=[src_ann()]
+            margin=CM, legend=LEG, dragmode=False,
+            annotations=[src_ann()]
         )
-        st.plotly_chart(fig_rv, use_container_width=True, key="fig_realyield")
+        st.plotly_chart(fig_rv, use_container_width=True, key="fig_realyield", config=PCFG)
 
+    # Yield curve snapshot — commentary BELOW chart
+    st.plotly_chart(build_yield_curve(), use_container_width=True,
+                    key="yc_rates", config=PCFG)
     c = yield_curve_commentary()
     if c: st.caption(c)
-    st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_rates")
 
     fig_cr = go.Figure()
     for sid, lbl in CREDIT.items():
@@ -533,9 +573,10 @@ with tab3:
         title=chart_title("Credit Spreads (OAS)",
                           "ICE BofA OAS over Treasuries · wider = risk-off"),
         template="plotly_white", height=420, yaxis_title="bps",
-        margin=CM, legend=LEG, annotations=[src_ann()]
+        margin=CM, legend=LEG, dragmode=False,
+        annotations=[src_ann()]
     )
-    st.plotly_chart(fig_cr, use_container_width=True, key="fig_credit")
+    st.plotly_chart(fig_cr, use_container_width=True, key="fig_credit", config=PCFG)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — MACRO
@@ -559,9 +600,10 @@ with tab4:
         fig_cpi.update_layout(
             title=chart_title("CPI & Core CPI", "YoY % · Core excludes food & energy"),
             template="plotly_white", height=420, yaxis_title="YoY %",
-            margin=CM, legend=LEG, annotations=[src_ann()]
+            margin=CM, legend=LEG, dragmode=False,
+            annotations=[src_ann()]
         )
-        st.plotly_chart(fig_cpi, use_container_width=True, key="fig_cpi")
+        st.plotly_chart(fig_cpi, use_container_width=True, key="fig_cpi", config=PCFG)
 
     with col_b:
         fig_pce = go.Figure()
@@ -576,9 +618,10 @@ with tab4:
         fig_pce.update_layout(
             title=chart_title("PCE & Core PCE", "YoY % · Fed's preferred inflation gauge"),
             template="plotly_white", height=420, yaxis_title="YoY %",
-            margin=CM, legend=LEG, annotations=[src_ann()]
+            margin=CM, legend=LEG, dragmode=False,
+            annotations=[src_ann()]
         )
-        st.plotly_chart(fig_pce, use_container_width=True, key="fig_pce")
+        st.plotly_chart(fig_pce, use_container_width=True, key="fig_pce", config=PCFG)
 
     col_c, col_d = st.columns(2)
     with col_c:
@@ -595,9 +638,10 @@ with tab4:
             title=chart_title("Fed Funds Rate & Unemployment",
                               "Policy rate vs U-3 unemployment — dual mandate"),
             template="plotly_white", height=420, yaxis_title="%",
-            margin=CM, legend=LEG, annotations=[src_ann()]
+            margin=CM, legend=LEG, dragmode=False,
+            annotations=[src_ann()]
         )
-        st.plotly_chart(fig_ff, use_container_width=True, key="fig_fedfunds")
+        st.plotly_chart(fig_ff, use_container_width=True, key="fig_fedfunds", config=PCFG)
 
     with col_d:
         try:
@@ -612,9 +656,10 @@ with tab4:
                 title=chart_title("Real GDP Growth",
                                   "QoQ annualized % (SAAR) · two negative = technical recession"),
                 template="plotly_white", height=420, yaxis_title="% QoQ Ann.",
-                margin=CM, legend=LEG, annotations=[src_ann()]
+                margin=CM, legend=LEG, dragmode=False,
+                annotations=[src_ann()]
             )
-            st.plotly_chart(fig_gdp, use_container_width=True, key="fig_gdp")
+            st.plotly_chart(fig_gdp, use_container_width=True, key="fig_gdp", config=PCFG)
         except Exception:
             st.info("GDP data unavailable.")
 
@@ -631,17 +676,6 @@ with tab5:
         with st.spinner("Loading…"):
             snap = fetch_release_snapshot()
         if not snap.empty:
-            def snap_color(row):
-                styles = [""] * len(row)
-                try:
-                    cols = list(row.index)
-                    l, p = float(row["Latest"]), float(row["Previous"])
-                    idx  = cols.index("Latest")
-                    styles[idx] = ("color: #2ca02c; font-weight:bold" if l > p
-                                   else "color: #d62728; font-weight:bold" if l < p else "")
-                except Exception:
-                    pass
-                return styles
             st.dataframe(snap.style.apply(snap_color, axis=1),
                          hide_index=True, use_container_width=True, height=420)
 
