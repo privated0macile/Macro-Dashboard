@@ -10,7 +10,6 @@ import fredapi
 
 # ─── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Macro Dashboard", layout="wide", page_icon="📊")
-
 st.markdown("""
 <style>
 div[data-testid="metric-container"] {
@@ -24,9 +23,9 @@ div[data-testid="metric-container"] {
 """, unsafe_allow_html=True)
 
 # ─── SECRETS ───────────────────────────────────────────────────────────────────
-FRED_KEY    = st.secrets["FRED_API_KEY"]
-FINNHUB_KEY = st.secrets["FINNHUB_API_KEY"]
-fred        = fredapi.Fred(api_key=FRED_KEY)
+FRED_KEY = st.secrets["FRED_API_KEY"]
+FMP_KEY  = st.secrets["FMP_API_KEY"]
+fred     = fredapi.Fred(api_key=FRED_KEY)
 
 # ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 START = "2015-01-01"
@@ -46,6 +45,21 @@ SECTORS = {
 YIELDS  = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
 
+# Key releases to show in macro snapshot table
+KEY_RELEASES = [
+    ("Nonfarm Payrolls",      "PAYEMS",         "000s MoM",  "diff"),
+    ("Unemployment Rate",     "UNRATE",          "%",         "level"),
+    ("CPI YoY",               "CPIAUCSL",        "% YoY",     "yoy"),
+    ("Core CPI YoY",          "CPILFESL",        "% YoY",     "yoy"),
+    ("PCE YoY",               "PCEPI",           "% YoY",     "yoy"),
+    ("Core PCE YoY",          "PCEPILFE",        "% YoY",     "yoy"),
+    ("GDP Growth QoQ Ann.",   "A191RL1Q225SBEA", "% Ann.",    "level"),
+    ("Retail Sales MoM",      "RSAFS",           "% MoM",     "mom"),
+    ("Industrial Production", "INDPRO",          "% MoM",     "mom"),
+    ("Fed Funds Rate",        "FEDFUNDS",        "%",         "level"),
+    ("10Y–2Y Spread",         "T10Y2Y",          "%",         "level"),
+]
+
 FOMC = {
     "2025": [
         ("Jan 28–29", "2025-01-29"), ("Mar 18–19", "2025-03-19"),
@@ -64,7 +78,7 @@ FOMC = {
 # ─── DATA FETCHERS ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600)
-def fetch_fred(series_id, start=START):
+def fetch_fred_series(series_id, start=START):
     s = fred.get_series(series_id, observation_start=start)
     s.index = pd.to_datetime(s.index)
     return s.dropna()
@@ -75,34 +89,93 @@ def fetch_equity():
     raw = yf.download(tickers, start=START, auto_adjust=True, progress=False)
     return raw["Close"]
 
-@st.cache_data(ttl=3600)
-def fetch_calendar():
-    today = datetime.today()
-    params = {
-        "token": FINNHUB_KEY,
-        "from":  (today - timedelta(days=7)).strftime("%Y-%m-%d"),
-        "to":    (today + timedelta(days=45)).strftime("%Y-%m-%d"),
-    }
-    r = requests.get("https://finnhub.io/api/v1/calendar/economic", params=params, timeout=10)
+@st.cache_data(ttl=1800)
+def fetch_fmp_calendar(date_from, date_to):
+    url = (
+        f"https://financialmodelingprep.com/api/v3/economic_calendar"
+        f"?from={date_from}&to={date_to}&apikey={FMP_KEY}"
+    )
+    r = requests.get(url, timeout=10)
     if r.status_code != 200:
         return pd.DataFrame()
-    events = r.json().get("economicCalendar", [])
-    df = pd.DataFrame(events)
-    if df.empty:
-        return df
-    df["time"] = pd.to_datetime(df["time"], errors="coerce")
-    df = df[df.get("country", pd.Series(dtype=str)) == "US"].sort_values("time")
-    return df[["time", "event", "estimate", "prev", "actual", "unit"]].reset_index(drop=True)
+    data = r.json()
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    df = df[df.get("country", pd.Series(dtype=str)) == "US"]
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df = df.sort_values("date")
+    return df.reset_index(drop=True)
+
+@st.cache_data(ttl=3600)
+def fetch_release_snapshot():
+    rows = []
+    for name, sid, unit, calc in KEY_RELEASES:
+        try:
+            s = fetch_fred_series(sid, start="2022-01-01")
+            if len(s) < 2:
+                continue
+            last_val = s.iloc[-1]
+            prev_val = s.iloc[-2]
+            last_date = s.index[-1].strftime("%b %d, %Y")
+            if calc == "yoy":
+                sy = s.pct_change(12) * 100
+                last_val, prev_val = round(sy.iloc[-1], 2), round(sy.iloc[-2], 2)
+            elif calc == "mom":
+                sm = s.pct_change() * 100
+                last_val, prev_val = round(sm.iloc[-1], 2), round(sm.iloc[-2], 2)
+            elif calc == "diff":
+                last_val = round(s.diff().iloc[-1], 1)
+                prev_val = round(s.diff().iloc[-2], 1)
+            else:
+                last_val, prev_val = round(last_val, 2), round(prev_val, 2)
+
+            # next release date via FRED API
+            next_date = "—"
+            try:
+                today_str = datetime.today().strftime("%Y-%m-%d")
+                to_str    = (datetime.today() + timedelta(days=60)).strftime("%Y-%m-%d")
+                rel_r = requests.get(
+                    f"https://api.stlouisfed.org/fred/series/release"
+                    f"?series_id={sid}&api_key={FRED_KEY}&file_type=json", timeout=5
+                )
+                if rel_r.status_code == 200:
+                    rel_id = rel_r.json()["releases"][0]["id"]
+                    dates_r = requests.get(
+                        f"https://api.stlouisfed.org/fred/release/dates"
+                        f"?release_id={rel_id}&api_key={FRED_KEY}&file_type=json"
+                        f"&realtime_start={today_str}&realtime_end={to_str}"
+                        f"&include_release_dates_with_no_data=true", timeout=5
+                    )
+                    if dates_r.status_code == 200:
+                        future = [
+                            d["date"] for d in dates_r.json().get("release_dates", [])
+                            if d["date"] >= today_str
+                        ]
+                        if future:
+                            next_date = pd.Timestamp(future[0]).strftime("%b %d, %Y")
+            except Exception:
+                pass
+
+            rows.append({
+                "Release":      name,
+                "Last Updated": last_date,
+                "Previous":     prev_val,
+                "Latest":       last_val,
+                "Unit":         unit,
+                "Next Release": next_date,
+            })
+        except Exception:
+            continue
+    return pd.DataFrame(rows)
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
-def to_yoy(s):
-    return s.pct_change(12) * 100
+def to_yoy(s):   return s.pct_change(12) * 100
+def to_mom(s):   return s.pct_change() * 100
 
 def trim(s, months):
-    if months:
-        return s[s.index >= s.index.max() - pd.DateOffset(months=months)]
-    return s
+    return s[s.index >= s.index.max() - pd.DateOffset(months=months)] if months else s
 
 def compute_relative(prices, asset_dict):
     rel   = prices[list(asset_dict.keys())].div(prices[BENCH], axis=0)
@@ -116,29 +189,45 @@ def reindex_from(df, base_date):
 def build_yield_curve():
     maturities = {
         "DGS1MO": "1M", "DGS3MO": "3M", "DGS6MO": "6M",
-        "DGS1": "1Y", "DGS2": "2Y", "DGS5": "5Y",
+        "DGS1": "1Y",   "DGS2": "2Y",   "DGS5": "5Y",
         "DGS10": "10Y", "DGS20": "20Y", "DGS30": "30Y"
     }
     vals, labels = [], []
     for sid, lbl in maturities.items():
         try:
-            s = fetch_fred(sid, start="2020-01-01")
+            s = fetch_fred_series(sid, start="2020-01-01")
             vals.append(round(s.iloc[-1], 3))
             labels.append(lbl)
         except Exception:
             pass
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=labels, y=vals, mode="lines+markers",
-                             line=dict(color="#1f77b4", width=2.5),
-                             marker=dict(size=8)))
+                             line=dict(color="#1f77b4", width=2.5), marker=dict(size=8)))
     fig.update_layout(title="<b>Current Yield Curve</b>", template="plotly_white",
                       height=360, yaxis_title="Yield (%)", xaxis_title="Maturity")
     return fig
 
+def beat_miss_color(df):
+    """Colour the Beat/Miss column green/red/gray."""
+    def _style(row):
+        styles = [""] * len(row)
+        cols = list(row.index)
+        if "Beat / Miss" in cols:
+            idx = cols.index("Beat / Miss")
+            val = str(row["Beat / Miss"])
+            if val == "✅ Beat":
+                styles[idx] = "color: #2ca02c; font-weight: bold"
+            elif val == "❌ Miss":
+                styles[idx] = "color: #d62728; font-weight: bold"
+            elif val == "➖ In-line":
+                styles[idx] = "color: #888888"
+        return styles
+    return df.style.apply(_style, axis=1)
+
 # ─── PAGE HEADER ───────────────────────────────────────────────────────────────
 
 st.title("📊 Macro Dashboard")
-st.caption(f"Refreshed: {datetime.now().strftime('%b %d, %Y  %H:%M')}  •  Data: FRED · Yahoo Finance · Finnhub")
+st.caption(f"Refreshed: {datetime.now().strftime('%b %d, %Y  %H:%M')}  •  Data: FRED · Yahoo Finance · FMP")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
     ["🏠  Overview", "📈  Markets", "📉  Rates", "🌍  Macro", "📅  Calendar"]
@@ -152,16 +241,16 @@ with tab1:
     st.subheader("Key Indicators")
     c = st.columns(6)
     snapshot = [
-        ("DGS2",      "2Y Treasury",    True,  "%"),
-        ("DGS10",     "10Y Treasury",   True,  "%"),
-        ("DGS30",     "30Y Treasury",   True,  "%"),
-        ("FEDFUNDS",  "Fed Funds Rate", False, "%"),
-        ("CPIAUCSL",  "CPI YoY",        True,  "%"),
-        ("T10Y2Y",    "10Y–2Y Spread",  True,  "%"),
+        ("DGS2",     "2Y Treasury",    True,  "%"),
+        ("DGS10",    "10Y Treasury",   True,  "%"),
+        ("DGS30",    "30Y Treasury",   True,  "%"),
+        ("FEDFUNDS", "Fed Funds Rate", False, "%"),
+        ("CPIAUCSL", "CPI YoY",        True,  "%"),
+        ("T10Y2Y",   "10Y–2Y Spread",  True,  "%"),
     ]
     for i, (sid, label, show_delta, unit) in enumerate(snapshot):
         try:
-            s = to_yoy(fetch_fred(sid)) if sid == "CPIAUCSL" else fetch_fred(sid)
+            s = to_yoy(fetch_fred_series(sid)) if sid == "CPIAUCSL" else fetch_fred_series(sid)
             cur, prev = s.iloc[-1], s.iloc[-2]
             delta = f"{cur - prev:+.2f}{unit}" if show_delta else None
             c[i].metric(label, f"{cur:.2f}{unit}", delta)
@@ -175,22 +264,16 @@ with tab1:
         st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_overview")
 
     with col_r:
-        st.subheader("Upcoming Releases")
+        st.subheader("Upcoming Key Releases")
         try:
-            cal = fetch_calendar()
-            today_ts = pd.Timestamp.today().normalize()
-            upcoming = cal[cal["time"] >= today_ts].head(10)
-            if not upcoming.empty:
-                disp = upcoming.copy()
-                disp["Date"] = disp["time"].dt.strftime("%b %d")
-                disp = disp.rename(columns={"event": "Event", "estimate": "Est.",
-                                             "prev": "Prev", "actual": "Actual"})
-                st.dataframe(disp[["Date", "Event", "Prev", "Est.", "Actual"]],
-                             hide_index=True, use_container_width=True)
-            else:
-                st.info("No upcoming releases found.")
+            snap = fetch_release_snapshot()
+            if not snap.empty:
+                st.dataframe(
+                    snap[["Release", "Next Release", "Latest", "Unit"]].head(8),
+                    hide_index=True, use_container_width=True
+                )
         except Exception:
-            st.info("Calendar unavailable.")
+            st.info("Release data unavailable.")
 
     st.subheader("Next FOMC Meeting")
     all_fomc = FOMC["2025"] + FOMC["2026"]
@@ -215,7 +298,6 @@ with tab2:
         "Since 2025": "2025-01-01", "Past 12M":   None
     }
 
-    # ── Factors ──
     st.subheader("MSCI Factor Performance vs S&P 500")
     pf   = st.radio("Period", list(period_opts.keys()), horizontal=True, key="pf")
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
@@ -241,15 +323,14 @@ with tab2:
 
     st.divider()
 
-    # ── Sectors ──
     st.subheader("Sector ETF Performance vs S&P 500")
     ps     = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
     base_s = period_opts[ps] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
     rel_s, alpha_s = compute_relative(prices, SECTORS)
-    ri_s  = reindex_from(rel_s, base_s)
-    al_s  = alpha_s[alpha_s.index >= pd.Timestamp(base_s)]
-    disp  = ri_s.max(axis=1) - ri_s.min(axis=1)
+    ri_s = reindex_from(rel_s, base_s)
+    al_s = alpha_s[alpha_s.index >= pd.Timestamp(base_s)]
+    disp = ri_s.max(axis=1) - ri_s.min(axis=1)
 
     fig_s = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
                           subplot_titles=("Relative Performance vs SPY (indexed to 1.0)",
@@ -282,7 +363,7 @@ with tab3:
     fig_y = go.Figure()
     for i, (sid, lbl) in enumerate(YIELDS.items()):
         try:
-            s = trim(fetch_fred(sid), rmons)
+            s = trim(fetch_fred_series(sid), rmons)
             fig_y.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl,
                                        mode="lines", line=dict(color=colors[i], width=2)))
         except Exception:
@@ -291,13 +372,12 @@ with tab3:
     st.plotly_chart(fig_y, use_container_width=True, key="fig_yields")
 
     col1, col2 = st.columns(2)
-
     with col1:
         st.subheader("Yield Curve Spreads")
         fig_sp = go.Figure()
         for sid, lbl in SPREADS.items():
             try:
-                s = trim(fetch_fred(sid), rmons)
+                s = trim(fetch_fred_series(sid), rmons)
                 fig_sp.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
@@ -310,7 +390,7 @@ with tab3:
         fig_rv = go.Figure()
         for sid, lbl in [("DFII10", "10Y Real Yield"), ("T10YIE", "10Y Breakeven Infl.")]:
             try:
-                s = trim(fetch_fred(sid), rmons)
+                s = trim(fetch_fred_series(sid), rmons)
                 fig_rv.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
@@ -329,13 +409,12 @@ with tab4:
     mmon = {"2Y": 24, "5Y": 60, "10Y": 120, "Full": None}[mp]
 
     col_a, col_b = st.columns(2)
-
     with col_a:
         st.subheader("CPI & Core CPI (YoY %)")
         fig_cpi = go.Figure()
         for sid, lbl in [("CPIAUCSL", "CPI"), ("CPILFESL", "Core CPI")]:
             try:
-                s = trim(to_yoy(fetch_fred(sid)), mmon)
+                s = trim(to_yoy(fetch_fred_series(sid)), mmon)
                 fig_cpi.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
@@ -349,7 +428,7 @@ with tab4:
         fig_pce = go.Figure()
         for sid, lbl in [("PCEPI", "PCE"), ("PCEPILFE", "Core PCE")]:
             try:
-                s = trim(to_yoy(fetch_fred(sid)), mmon)
+                s = trim(to_yoy(fetch_fred_series(sid)), mmon)
                 fig_pce.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
@@ -359,14 +438,13 @@ with tab4:
         st.plotly_chart(fig_pce, use_container_width=True, key="fig_pce")
 
     col_c, col_d = st.columns(2)
-
     with col_c:
         st.subheader("Fed Funds Rate & Unemployment")
         fig_ff = go.Figure()
         for sid, lbl, col in [("FEDFUNDS", "Fed Funds Rate", "#1f77b4"),
                                ("UNRATE",   "Unemployment",   "#ff7f0e")]:
             try:
-                s = trim(fetch_fred(sid), mmon)
+                s = trim(fetch_fred_series(sid), mmon)
                 fig_ff.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl,
                                             mode="lines", line=dict(color=col, width=2)))
             except Exception:
@@ -377,7 +455,7 @@ with tab4:
     with col_d:
         st.subheader("Real GDP Growth (QoQ Annualized %)")
         try:
-            gdp = trim(fetch_fred("A191RL1Q225SBEA"), mmon)
+            gdp = trim(fetch_fred_series("A191RL1Q225SBEA"), mmon)
             fig_gdp = go.Figure()
             fig_gdp.add_trace(go.Bar(
                 x=gdp.index, y=gdp.values, name="GDP Growth",
@@ -394,40 +472,92 @@ with tab4:
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab5:
-    col_cal, col_fomc = st.columns([3, 1])
+    today      = datetime.today()
+    today_str  = today.strftime("%Y-%m-%d")
+    past_str   = (today - timedelta(days=35)).strftime("%Y-%m-%d")
+    future_str = (today + timedelta(days=45)).strftime("%Y-%m-%d")
 
-    with col_cal:
-        st.subheader("US Economic Releases")
-        st.caption("Past 7 days and next 45 days  •  Yellow = today  •  Gray = past")
-        try:
-            cal = fetch_calendar()
-            if not cal.empty:
-                today_ts = pd.Timestamp.today().normalize()
+    with st.spinner("Loading calendar data…"):
+        cal_past   = fetch_fmp_calendar(past_str,  today_str)
+        cal_future = fetch_fmp_calendar(today_str, future_str)
 
-                def row_style(row):
-                    if row["time"].normalize() == today_ts:
-                        return ["background-color: #fff3cd"] * len(row)
-                    if row["time"] < today_ts:
-                        return ["color: #aaaaaa"] * len(row)
-                    return [""] * len(row)
+    col_left, col_right = st.columns([3, 1])
 
-                disp = cal.copy()
-                disp["Date"] = disp["time"].dt.strftime("%b %d, %Y")
-                disp["Time"] = disp["time"].dt.strftime("%H:%M")
-                disp = disp.rename(columns={"event": "Event", "estimate": "Estimate",
-                                             "prev": "Previous", "actual": "Actual",
-                                             "unit": "Unit"})
-                st.dataframe(
-                    disp[["Date", "Time", "Event", "Previous", "Estimate", "Actual", "Unit"]]
-                    .style.apply(row_style, axis=1),
-                    hide_index=True, use_container_width=True, height=600
-                )
-            else:
-                st.info("No calendar data returned. Check your Finnhub API key.")
-        except Exception as e:
-            st.error(f"Calendar error: {e}")
+    with col_left:
 
-    with col_fomc:
+        # ── TABLE 1: UPCOMING ──────────────────────────────────────────────
+        st.subheader("📅 Upcoming Releases")
+        st.caption("Next 45 days  •  Consensus estimates where available")
+
+        if not cal_future.empty:
+            up = cal_future.copy()
+            up = up[up["actual"].isna() | (up["actual"] == "")]
+            up["Date"]      = up["date"].dt.strftime("%b %d, %Y")
+            up["Event"]     = up.get("event",    "")
+            up["Estimate"]  = up.get("estimate", pd.Series(dtype=float))
+            up["Previous"]  = up.get("previous", pd.Series(dtype=float))
+            up["Unit"]      = up.get("unit",     "")
+
+            display_up = up[["Date", "Event", "Estimate", "Previous", "Unit"]].copy()
+            display_up = display_up[display_up["Event"].str.strip() != ""]
+            display_up = display_up.reset_index(drop=True)
+
+            st.dataframe(display_up, hide_index=True, use_container_width=True, height=380)
+        else:
+            st.info("No upcoming release data available.")
+
+        st.divider()
+
+        # ── TABLE 2: PAST RELEASES ─────────────────────────────────────────
+        st.subheader("📋 Past Releases — Last 35 Days")
+        st.caption("Actual vs consensus estimate  •  Beat ✅  Miss ❌  In-line ➖")
+
+        if not cal_past.empty:
+            ps = cal_past.copy()
+            ps = ps[ps["actual"].notna() & (ps["actual"] != "")]
+            ps["Date"]     = ps["date"].dt.strftime("%b %d, %Y")
+            ps["Event"]    = ps.get("event",    "")
+            ps["Actual"]   = pd.to_numeric(ps.get("actual",   None), errors="coerce")
+            ps["Estimate"] = pd.to_numeric(ps.get("estimate", None), errors="coerce")
+            ps["Previous"] = pd.to_numeric(ps.get("previous", None), errors="coerce")
+            ps["Unit"]     = ps.get("unit", "")
+
+            # MoM % change: actual vs previous
+            ps["MoM Chg"] = np.where(
+                ps["Previous"].notna() & (ps["Previous"] != 0),
+                ((ps["Actual"] - ps["Previous"]) / ps["Previous"].abs() * 100).round(2),
+                np.nan
+            )
+            ps["MoM Chg"] = ps["MoM Chg"].apply(
+                lambda x: f"{x:+.2f}%" if pd.notna(x) else "—"
+            )
+
+            # Beat / Miss vs estimate
+            def beat_miss(row):
+                try:
+                    a, e = float(row["Actual"]), float(row["Estimate"])
+                    diff = abs(a - e)
+                    threshold = abs(e) * 0.02 if e != 0 else 0.05
+                    if diff <= threshold:  return "➖ In-line"
+                    return "✅ Beat" if a > e else "❌ Miss"
+                except Exception:
+                    return "—"
+            ps["Beat / Miss"] = ps.apply(beat_miss, axis=1)
+
+            display_ps = ps[["Date", "Event", "Previous", "Estimate",
+                              "Actual", "MoM Chg", "Beat / Miss", "Unit"]].copy()
+            display_ps = display_ps[display_ps["Event"].str.strip() != ""]
+            display_ps = display_ps.sort_values("Date", ascending=False).reset_index(drop=True)
+
+            st.dataframe(
+                beat_miss_color(display_ps),
+                hide_index=True, use_container_width=True, height=500
+            )
+        else:
+            st.info("No recent release data available.")
+
+    # ── FOMC SIDEBAR ──────────────────────────────────────────────────────
+    with col_right:
         st.subheader("FOMC Dates")
         today_d = datetime.today().date()
         for year, meetings in FOMC.items():
@@ -445,7 +575,7 @@ with tab5:
         st.divider()
         st.caption("**Current Fed Funds Rate**")
         try:
-            ff = fetch_fred("FEDFUNDS")
+            ff = fetch_fred_series("FEDFUNDS")
             st.metric("Fed Funds", f"{ff.iloc[-1]:.2f}%")
         except Exception:
             st.metric("Fed Funds", "N/A")
