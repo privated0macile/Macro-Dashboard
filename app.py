@@ -281,11 +281,15 @@ def cred_color(row):
 
 # ─── PAGE HEADER ───────────────────────────────────────────────────────────────
 
-st.title("📊 Macro Dashboard")
-st.caption(f"Refreshed: {datetime.now().strftime('%b %d, %Y  %H:%M')}  •  Data: FRED · Yahoo Finance")
+st.markdown(f"""
+<div style="background-color:#0a2342;padding:22px 32px 18px 32px;margin:-1rem -1rem 1.5rem -1rem;border-radius:0">
+    <span style="color:white;font-size:26px;font-weight:700;letter-spacing:0.5px">Macro Dashboard</span><br>
+    <span style="color:#a8bdd4;font-size:12px">Refreshed: {datetime.now().strftime('%b %d, %Y  %H:%M')} &nbsp;·&nbsp; Data: FRED · Yahoo Finance</span>
+</div>
+""", unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["🏠  Overview", "📈  Markets", "📉  Rates", "🌍  Macro", "📅  Calendar"]
+    ["Overview", "Markets", "Rates", "Macro", "Calendar"]
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -671,8 +675,8 @@ with tab5:
     col_left, col_right = st.columns([3, 1])
 
     with col_left:
-        st.subheader("Key Release Snapshot")
-        st.caption("Latest actuals and next scheduled release dates — all via FRED")
+        st.subheader("Upcoming Releases")
+        st.caption("Next 45 days and past 35 days — all via FRED")
         with st.spinner("Loading…"):
             snap = fetch_release_snapshot()
         if not snap.empty:
