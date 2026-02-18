@@ -46,19 +46,18 @@ YIELDS  = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
 CREDIT  = {"BAMLH0A0HYM2": "HY OAS", "BAMLC0A0CM": "IG OAS"}
 
-# Key releases to show in macro snapshot table
 KEY_RELEASES = [
-    ("Nonfarm Payrolls",      "PAYEMS",         "000s MoM",  "diff"),
-    ("Unemployment Rate",     "UNRATE",          "%",         "level"),
-    ("CPI YoY",               "CPIAUCSL",        "% YoY",     "yoy"),
-    ("Core CPI YoY",          "CPILFESL",        "% YoY",     "yoy"),
-    ("PCE YoY",               "PCEPI",           "% YoY",     "yoy"),
-    ("Core PCE YoY",          "PCEPILFE",        "% YoY",     "yoy"),
-    ("GDP Growth QoQ Ann.",   "A191RL1Q225SBEA", "% Ann.",    "level"),
-    ("Retail Sales MoM",      "RSAFS",           "% MoM",     "mom"),
-    ("Industrial Production", "INDPRO",          "% MoM",     "mom"),
-    ("Fed Funds Rate",        "FEDFUNDS",        "%",         "level"),
-    ("10Y–2Y Spread",         "T10Y2Y",          "%",         "level"),
+    ("Nonfarm Payrolls",      "PAYEMS",         "000s MoM", "diff"),
+    ("Unemployment Rate",     "UNRATE",         "%",        "level"),
+    ("CPI YoY",               "CPIAUCSL",       "% YoY",    "yoy"),
+    ("Core CPI YoY",          "CPILFESL",       "% YoY",    "yoy"),
+    ("PCE YoY",               "PCEPI",          "% YoY",    "yoy"),
+    ("Core PCE YoY",          "PCEPILFE",       "% YoY",    "yoy"),
+    ("GDP Growth QoQ Ann.",   "A191RL1Q225SBEA","% Ann.",   "level"),
+    ("Retail Sales MoM",      "RSAFS",          "% MoM",    "mom"),
+    ("Industrial Production", "INDPRO",         "% MoM",    "mom"),
+    ("Fed Funds Rate",        "FEDFUNDS",       "%",        "level"),
+    ("10Y–2Y Spread",         "T10Y2Y",         "%",        "level"),
 ]
 
 FOMC = {
@@ -92,21 +91,22 @@ def fetch_equity():
 
 @st.cache_data(ttl=1800)
 def fetch_fmp_calendar(date_from, date_to):
-    url = (
-        f"https://financialmodelingprep.com/api/v3/economic_calendar"
-        f"?from={date_from}&to={date_to}&apikey={FMP_KEY}"
-    )
-    r = requests.get(url, timeout=10)
-    if r.status_code != 200:
-        return pd.DataFrame()
-    data = r.json()
-    if not data:
-        return pd.DataFrame()
-    df = pd.DataFrame(data)
-    df = df[df.get("country", pd.Series(dtype=str)) == "US"]
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df = df.sort_values("date")
-    return df.reset_index(drop=True)
+    url = (f"https://financialmodelingprep.com/api/v3/economic_calendar"
+           f"?from={date_from}&to={date_to}&apikey={FMP_KEY}")
+    try:
+        r = requests.get(url, timeout=15)
+        if r.status_code != 200:
+            return pd.DataFrame(), f"HTTP {r.status_code}"
+        data = r.json()
+        if not data or not isinstance(data, list):
+            return pd.DataFrame(), "Empty response"
+        df = pd.DataFrame(data)
+        if "country" in df.columns:
+            df = df[df["country"] == "US"]
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        return df.sort_values("date").reset_index(drop=True), None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 @st.cache_data(ttl=3600)
 def fetch_release_snapshot():
@@ -116,8 +116,7 @@ def fetch_release_snapshot():
             s = fetch_fred_series(sid, start="2022-01-01")
             if len(s) < 2:
                 continue
-            last_val = s.iloc[-1]
-            prev_val = s.iloc[-2]
+            last_val, prev_val = s.iloc[-1], s.iloc[-2]
             last_date = s.index[-1].strftime("%b %d, %Y")
             if calc == "yoy":
                 sy = s.pct_change(12) * 100
@@ -130,50 +129,37 @@ def fetch_release_snapshot():
                 prev_val = round(s.diff().iloc[-2], 1)
             else:
                 last_val, prev_val = round(last_val, 2), round(prev_val, 2)
-
-            # next release date via FRED API
             next_date = "—"
             try:
                 today_str = datetime.today().strftime("%Y-%m-%d")
                 to_str    = (datetime.today() + timedelta(days=60)).strftime("%Y-%m-%d")
                 rel_r = requests.get(
                     f"https://api.stlouisfed.org/fred/series/release"
-                    f"?series_id={sid}&api_key={FRED_KEY}&file_type=json", timeout=5
-                )
+                    f"?series_id={sid}&api_key={FRED_KEY}&file_type=json", timeout=5)
                 if rel_r.status_code == 200:
                     rel_id = rel_r.json()["releases"][0]["id"]
                     dates_r = requests.get(
                         f"https://api.stlouisfed.org/fred/release/dates"
                         f"?release_id={rel_id}&api_key={FRED_KEY}&file_type=json"
                         f"&realtime_start={today_str}&realtime_end={to_str}"
-                        f"&include_release_dates_with_no_data=true", timeout=5
-                    )
+                        f"&include_release_dates_with_no_data=true", timeout=5)
                     if dates_r.status_code == 200:
-                        future = [
-                            d["date"] for d in dates_r.json().get("release_dates", [])
-                            if d["date"] >= today_str
-                        ]
+                        future = [d["date"] for d in dates_r.json().get("release_dates", [])
+                                  if d["date"] >= today_str]
                         if future:
                             next_date = pd.Timestamp(future[0]).strftime("%b %d, %Y")
             except Exception:
                 pass
-
-            rows.append({
-                "Release":      name,
-                "Last Updated": last_date,
-                "Previous":     prev_val,
-                "Latest":       last_val,
-                "Unit":         unit,
-                "Next Release": next_date,
-            })
+            rows.append({"Release": name, "Last Updated": last_date,
+                         "Previous": prev_val, "Latest": last_val,
+                         "Unit": unit, "Next Release": next_date})
         except Exception:
             continue
     return pd.DataFrame(rows)
 
 # ─── HELPERS ───────────────────────────────────────────────────────────────────
 
-def to_yoy(s):   return s.pct_change(12) * 100
-def to_mom(s):   return s.pct_change() * 100
+def to_yoy(s): return s.pct_change(12) * 100
 
 def trim(s, months):
     return s[s.index >= s.index.max() - pd.DateOffset(months=months)] if months else s
@@ -186,6 +172,35 @@ def compute_relative(prices, asset_dict):
 def reindex_from(df, base_date):
     df = df[df.index >= pd.Timestamp(base_date)]
     return df / df.iloc[0]
+
+def src_ann(y=-0.1):
+    """Bottom-right source annotation for plotly figures."""
+    return dict(text="Source: FRED / Yahoo Finance", xref="paper", yref="paper",
+                x=1.0, y=y, showarrow=False,
+                font=dict(size=10, color="#888888"), xanchor="right")
+
+def yield_curve_commentary():
+    """Auto-generate a one-liner on current curve shape and trend."""
+    try:
+        y2  = fetch_fred_series("DGS2").iloc[-1]
+        y10 = fetch_fred_series("DGS10").iloc[-1]
+        y30 = fetch_fred_series("DGS30").iloc[-1]
+        s2  = fetch_fred_series("DGS2")
+        s10 = fetch_fred_series("DGS10")
+        spread_now  = y10 - y2
+        spread_3m   = (s10 - s2).dropna()
+        spread_prev = spread_3m.iloc[-63] if len(spread_3m) > 63 else spread_3m.iloc[0]
+        change = spread_now - spread_prev
+        if spread_now < -0.1:    shape = "inverted"
+        elif spread_now < 0.1:   shape = "flat"
+        else:                    shape = "normal (upward sloping)"
+        if change > 0.1:         trend = "steepening over the past 3 months"
+        elif change < -0.1:      trend = "flattening over the past 3 months"
+        else:                    trend = "largely unchanged over the past 3 months"
+        return (f"Curve is currently **{shape}** — 2Y at {y2:.2f}%, 10Y at {y10:.2f}%, "
+                f"30Y at {y30:.2f}%. 10Y–2Y spread: {spread_now:+.2f}%, {trend}.")
+    except Exception:
+        return ""
 
 def build_yield_curve():
     maturities = {
@@ -205,25 +220,25 @@ def build_yield_curve():
     fig.add_trace(go.Scatter(x=labels, y=vals, mode="lines+markers",
                              line=dict(color="#1f77b4", width=2.5), marker=dict(size=8)))
     fig.update_layout(title="<b>Current Yield Curve</b>", template="plotly_white",
-                      height=360, yaxis_title="Yield (%)", xaxis_title="Maturity")
+                      height=360, yaxis_title="Yield (%)", xaxis_title="Maturity",
+                      margin=dict(b=60), annotations=[src_ann(-0.18)])
     return fig
 
 def beat_miss_color(df):
-    """Colour the Beat/Miss column green/red/gray."""
     def _style(row):
         styles = [""] * len(row)
         cols = list(row.index)
         if "Beat / Miss" in cols:
             idx = cols.index("Beat / Miss")
             val = str(row["Beat / Miss"])
-            if val == "✅ Beat":
-                styles[idx] = "color: #2ca02c; font-weight: bold"
-            elif val == "❌ Miss":
-                styles[idx] = "color: #d62728; font-weight: bold"
-            elif val == "➖ In-line":
-                styles[idx] = "color: #888888"
+            if "Beat"    in val: styles[idx] = "color: #2ca02c; font-weight: bold"
+            elif "Miss"  in val: styles[idx] = "color: #d62728; font-weight: bold"
+            elif "line"  in val: styles[idx] = "color: #888888"
         return styles
     return df.style.apply(_style, axis=1)
+
+def is_null_actual(val):
+    return pd.isna(val) or str(val).strip() in ("", "nan", "None", "null")
 
 # ─── PAGE HEADER ───────────────────────────────────────────────────────────────
 
@@ -239,69 +254,73 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(
 # ══════════════════════════════════════════════════════════════════════════════
 
 with tab1:
-    st.subheader("Key Indicators")
-    c = st.columns(6)
-    snapshot = [
-        ("DGS2",     "2Y Treasury",    True,  "%"),
-        ("DGS10",    "10Y Treasury",   True,  "%"),
-        ("DGS30",    "30Y Treasury",   True,  "%"),
-        ("FEDFUNDS", "Fed Funds Rate", False, "%"),
-        ("CPIAUCSL", "CPI YoY",        True,  "%"),
-        ("T10Y2Y",   "10Y–2Y Spread",  True,  "%"),
-    ]
-    for i, (sid, label, show_delta, unit) in enumerate(snapshot):
-        try:
-            s = to_yoy(fetch_fred_series(sid)) if sid == "CPIAUCSL" else fetch_fred_series(sid)
-            cur, prev = s.iloc[-1], s.iloc[-2]
-            delta = f"{cur - prev:+.2f}{unit}" if show_delta else None
-            c[i].metric(label, f"{cur:.2f}{unit}", delta)
-        except Exception:
-            c[i].metric(label, "N/A")
+    ind_col, cred_col = st.columns([3, 1])
 
-    st.divider()
+    with ind_col:
+        st.subheader("Key Indicators")
+        row1 = st.columns(3)
+        row2 = st.columns(3)
+        snapshot = [
+            ("DGS2",     "2Y Treasury",   True,  "%"),
+            ("DGS10",    "10Y Treasury",  True,  "%"),
+            ("DGS30",    "30Y Treasury",  True,  "%"),
+            ("FEDFUNDS", "Fed Funds",     False, "%"),
+            ("CPIAUCSL", "CPI YoY",       True,  "%"),
+            ("T10Y2Y",   "10Y–2Y Spread", True,  "%"),
+        ]
+        for i, (sid, label, show_delta, unit) in enumerate(snapshot):
+            col = row1[i] if i < 3 else row2[i - 3]
+            try:
+                s = to_yoy(fetch_fred_series(sid)) if sid == "CPIAUCSL" else fetch_fred_series(sid)
+                cur, prev = s.iloc[-1], s.iloc[-2]
+                delta = f"{cur - prev:+.2f}{unit} DoD" if show_delta else None
+                col.metric(label, f"{cur:.2f}{unit}", delta)
+            except Exception:
+                col.metric(label, "N/A")
 
-    # ── Credit spread snapshot ──
-    st.subheader("Credit Spreads (OAS, bps)")
-    cc = st.columns(3)
-    credit_snap = [
-        ("BAMLH0A0HYM2", "HY OAS"),
-        ("BAMLC0A0CM",   "IG OAS"),
-    ]
-    hy_val, ig_val = None, None
-    for i, (sid, label) in enumerate(credit_snap):
+    with cred_col:
+        st.subheader("Credit Spreads")
         try:
-            s = fetch_fred_series(sid)
-            cur, prev = s.iloc[-1], s.iloc[-2]
-            if label == "HY OAS": hy_val = cur
-            if label == "IG OAS": ig_val = cur
-            cc[i].metric(label, f"{cur:.0f} bps", f"{cur - prev:+.0f} bps")
+            hy_s  = fetch_fred_series("BAMLH0A0HYM2")  # series in %
+            ig_s  = fetch_fred_series("BAMLC0A0CM")
+            t10_s = fetch_fred_series("DGS10")
+            hy_oas, hy_prev = hy_s.iloc[-1], hy_s.iloc[-2]
+            ig_oas, ig_prev = ig_s.iloc[-1], ig_s.iloc[-2]
+            t10 = t10_s.iloc[-1]
+            hy_yield = hy_oas + t10
+            ig_yield = ig_oas + t10
+            gap, gap_prev = hy_oas - ig_oas, hy_prev - ig_prev
+
+            st.metric("HY OAS",    f"{hy_oas * 100:.0f} bps",
+                      f"{(hy_oas - hy_prev) * 100:+.0f} bps DoD")
+            st.metric("HY Yield",  f"{hy_yield:.2f}%",
+                      f"{(hy_oas - hy_prev) * 100:+.0f} bps DoD")
+            st.metric("IG OAS",    f"{ig_oas * 100:.0f} bps",
+                      f"{(ig_oas - ig_prev) * 100:+.0f} bps DoD")
+            st.metric("IG Yield",  f"{ig_yield:.2f}%",
+                      f"{(ig_oas - ig_prev) * 100:+.0f} bps DoD")
+            st.metric("HY–IG Gap", f"{gap * 100:.0f} bps",
+                      f"{(gap - gap_prev) * 100:+.0f} bps DoD")
+            st.caption("Yield = OAS + 10Y Treasury (approx.)")
         except Exception:
-            cc[i].metric(label, "N/A")
-    if hy_val and ig_val:
-        gap = hy_val - ig_val
-        try:
-            hy_s = fetch_fred_series("BAMLH0A0HYM2")
-            ig_s = fetch_fred_series("BAMLC0A0CM")
-            prev_gap = hy_s.iloc[-2] - ig_s.iloc[-2]
-            cc[2].metric("HY–IG Gap", f"{gap:.0f} bps", f"{gap - prev_gap:+.0f} bps")
-        except Exception:
-            cc[2].metric("HY–IG Gap", f"{gap:.0f} bps")
+            st.info("Credit data unavailable.")
 
     st.divider()
     col_l, col_r = st.columns(2)
 
     with col_l:
         st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_overview")
+        commentary = yield_curve_commentary()
+        if commentary:
+            st.caption(commentary)
 
     with col_r:
         st.subheader("Upcoming Key Releases")
         try:
             snap = fetch_release_snapshot()
             if not snap.empty:
-                st.dataframe(
-                    snap[["Release", "Next Release", "Latest", "Unit"]].head(8),
-                    hide_index=True, use_container_width=True
-                )
+                st.dataframe(snap[["Release", "Next Release", "Latest", "Unit"]].head(8),
+                             hide_index=True, use_container_width=True)
         except Exception:
             st.info("Release data unavailable.")
 
@@ -328,7 +347,11 @@ with tab2:
         "Since 2025": "2025-01-01", "Past 12M":   None
     }
 
+    # ── Factors ──
     st.subheader("MSCI Factor Performance vs S&P 500")
+    st.caption("Each line = factor ETF price ÷ SPY price, indexed to 1.0 at start. "
+               "Above 1.0 = outperforming SPY. Rolling alpha = compounded 126-day (6-month) "
+               "return of the relative price series — positive = outperforming on a rolling basis.")
     pf   = st.radio("Period", list(period_opts.keys()), horizontal=True, key="pf")
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
@@ -336,7 +359,7 @@ with tab2:
     ri_f = reindex_from(rel_f, base)
     al_f = alpha_f[alpha_f.index >= pd.Timestamp(base)]
 
-    fig_f = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+    fig_f = make_subplots(rows=2, cols=1, shared_xaxes=False, vertical_spacing=0.14,
                           subplot_titles=("Relative Performance vs SPY (indexed to 1.0)",
                                           "Rolling 6-Month Relative Alpha"))
     for tkr, name in FACTORS.items():
@@ -347,13 +370,22 @@ with tab2:
                                        showlegend=False), row=2, col=1)
     fig_f.add_hline(y=1.0, line_dash="dash", line_color="gray", row=1, col=1)
     fig_f.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
-    fig_f.update_layout(template="plotly_white", height=580,
-                        legend=dict(orientation="h", y=-0.15))
+    fig_f.update_xaxes(showticklabels=True, row=1, col=1)
+    fig_f.update_xaxes(showticklabels=True, row=2, col=1)
+    fig_f.update_layout(template="plotly_white", height=620,
+                        legend=dict(orientation="h", y=-0.07),
+                        margin=dict(b=80), annotations=[src_ann(-0.1)])
     st.plotly_chart(fig_f, use_container_width=True, key="fig_factors")
 
     st.divider()
 
+    # ── Sectors ──
     st.subheader("Sector ETF Performance vs S&P 500")
+    st.caption("Relative performance vs SPY as above. "
+               "Dispersion (max − min of relative prices): higher = wider spread between best/worst sectors, "
+               "i.e. more between-sector differentiation. "
+               "Avg Pairwise Correlation (21-day rolling): higher = sectors moving together (macro/factor driven); "
+               "lower = idiosyncratic sector moves dominating.")
     ps     = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
     base_s = period_opts[ps] or (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d")
 
@@ -362,22 +394,41 @@ with tab2:
     al_s = alpha_s[alpha_s.index >= pd.Timestamp(base_s)]
     disp = ri_s.max(axis=1) - ri_s.min(axis=1)
 
-    fig_s = make_subplots(rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
-                          subplot_titles=("Relative Performance vs SPY (indexed to 1.0)",
-                                          "Rolling 6-Month Relative Alpha",
-                                          "Cross-Sectional Dispersion (max − min)"))
+    # Rolling avg pairwise correlation — proxy for within/between sector movement
+    sec_rets = prices[list(SECTORS.keys())].pct_change().dropna()
+    sec_rets_t = sec_rets[sec_rets.index >= pd.Timestamp(base_s)]
+    roll_corr = (
+        sec_rets_t.rolling(21).corr()
+        .groupby(level=0)
+        .apply(lambda x: float(np.nanmean(
+            x.values[np.triu_indices_from(x.values, k=1)]
+        )))
+    )
+
+    fig_s = make_subplots(rows=4, cols=1, shared_xaxes=False, vertical_spacing=0.1,
+                          subplot_titles=(
+                              "Relative Performance vs SPY (indexed to 1.0)",
+                              "Rolling 6-Month Relative Alpha",
+                              "Cross-Sectional Dispersion (max − min)  ·  higher = more between-sector divergence",
+                              "Avg Pairwise Sector Correlation (21-day)  ·  higher = macro-driven  ·  lower = sector-specific"
+                          ))
     for tkr, name in SECTORS.items():
         if tkr in ri_s.columns:
             fig_s.add_trace(go.Scatter(x=ri_s.index, y=ri_s[tkr], name=name, mode="lines"), row=1, col=1)
         if tkr in al_s.columns:
             fig_s.add_trace(go.Scatter(x=al_s.index, y=al_s[tkr], name=name, mode="lines",
                                        showlegend=False), row=2, col=1)
-    fig_s.add_trace(go.Scatter(x=disp.index, y=disp, mode="lines", name="Dispersion",
-                               line=dict(color="#888", width=2), showlegend=False), row=3, col=1)
+    fig_s.add_trace(go.Scatter(x=disp.index, y=disp, mode="lines", showlegend=False,
+                               line=dict(color="#555", width=2)), row=3, col=1)
+    fig_s.add_trace(go.Scatter(x=roll_corr.index, y=roll_corr.values, mode="lines", showlegend=False,
+                               line=dict(color="#e377c2", width=2)), row=4, col=1)
     fig_s.add_hline(y=1.0, line_dash="dash", line_color="gray", row=1, col=1)
     fig_s.add_hline(y=0.0, line_dash="dash", line_color="gray", row=2, col=1)
-    fig_s.update_layout(template="plotly_white", height=760,
-                        legend=dict(orientation="h", y=-0.1))
+    for r in range(1, 5):
+        fig_s.update_xaxes(showticklabels=True, row=r, col=1)
+    fig_s.update_layout(template="plotly_white", height=980,
+                        legend=dict(orientation="h", y=-0.05),
+                        margin=dict(b=80), annotations=[src_ann(-0.07)])
     st.plotly_chart(fig_s, use_container_width=True, key="fig_sectors")
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -390,6 +441,7 @@ with tab3:
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
 
     st.subheader("Treasury Yields by Maturity")
+    st.caption("Daily constant-maturity Treasury yields. Shows absolute rate levels across the curve.")
     fig_y = go.Figure()
     for i, (sid, lbl) in enumerate(YIELDS.items()):
         try:
@@ -398,12 +450,15 @@ with tab3:
                                        mode="lines", line=dict(color=colors[i], width=2)))
         except Exception:
             pass
-    fig_y.update_layout(template="plotly_white", height=380, yaxis_title="Yield (%)")
+    fig_y.update_layout(template="plotly_white", height=380, yaxis_title="Yield (%)",
+                        margin=dict(b=60), annotations=[src_ann()])
     st.plotly_chart(fig_y, use_container_width=True, key="fig_yields")
 
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("Yield Curve Spreads")
+        st.caption("10Y–2Y: primary recession indicator — inversion (negative) has historically preceded recessions. "
+                   "10Y–3M: the Fed's preferred signal. Red dashed line = zero (inversion threshold).")
         fig_sp = go.Figure()
         for sid, lbl in SPREADS.items():
             try:
@@ -412,11 +467,15 @@ with tab3:
             except Exception:
                 pass
         fig_sp.add_hline(y=0, line_dash="dash", line_color="red", line_width=1)
-        fig_sp.update_layout(template="plotly_white", height=360, yaxis_title="Spread (%)")
+        fig_sp.update_layout(template="plotly_white", height=360, yaxis_title="Spread (%)",
+                             margin=dict(b=60), annotations=[src_ann()])
         st.plotly_chart(fig_sp, use_container_width=True, key="fig_spreads")
 
     with col2:
         st.subheader("Real Yield & Breakeven Inflation")
+        st.caption("Real yield = 10Y TIPS yield (nominal minus inflation expectations). "
+                   "Breakeven = market-implied 10Y inflation expectation. "
+                   "Rising real yields tighten conditions; rising breakevens signal inflation re-acceleration.")
         fig_rv = go.Figure()
         for sid, lbl in [("DFII10", "10Y Real Yield"), ("T10YIE", "10Y Breakeven Infl.")]:
             try:
@@ -425,38 +484,39 @@ with tab3:
             except Exception:
                 pass
         fig_rv.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
-        fig_rv.update_layout(template="plotly_white", height=360, yaxis_title="%")
+        fig_rv.update_layout(template="plotly_white", height=360, yaxis_title="%",
+                             margin=dict(b=60), annotations=[src_ann()])
         st.plotly_chart(fig_rv, use_container_width=True, key="fig_realyield")
 
+    st.subheader("Current Yield Curve Snapshot")
+    st.caption("Plots the full curve from 1M to 30Y as of latest available data.")
+    commentary = yield_curve_commentary()
+    if commentary:
+        st.caption(commentary)
     st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_rates")
 
-    st.divider()
-    st.subheader("Credit Spreads (OAS, bps)")
+    st.subheader("Credit Spreads (OAS)")
+    st.caption("Option-adjusted spread of US corporate bonds over equivalent Treasuries (ICE BofA indices via FRED). "
+               "HY (high yield / junk) spreads widen sharply in risk-off. IG is more stable. "
+               "HY–IG gap = premium for moving down the credit quality ladder. "
+               "All-in yield on Overview ≈ OAS + 10Y Treasury.")
     fig_cr = go.Figure()
     for sid, lbl in CREDIT.items():
         try:
-            s = trim(fetch_fred_series(sid), rmons)
-            fig_cr.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
+            s = trim(fetch_fred_series(sid), rmons) * 100  # % → bps
+            fig_cr.add_trace(go.Scatter(x=s.index, y=s.values, name=f"{lbl} (bps)", mode="lines"))
         except Exception:
             pass
-    # HY–IG gap
     try:
-        hy = trim(fetch_fred_series("BAMLH0A0HYM2"), rmons)
-        ig = trim(fetch_fred_series("BAMLC0A0CM"),   rmons)
-        gap = hy - ig
-        gap = gap.dropna()
-        fig_cr.add_trace(go.Scatter(x=gap.index, y=gap.values, name="HY–IG Gap",
+        hy  = trim(fetch_fred_series("BAMLH0A0HYM2"), rmons)
+        ig  = trim(fetch_fred_series("BAMLC0A0CM"),   rmons)
+        gap = (hy - ig).dropna() * 100
+        fig_cr.add_trace(go.Scatter(x=gap.index, y=gap.values, name="HY–IG Gap (bps)",
                                     mode="lines", line=dict(dash="dot", width=1.5)))
     except Exception:
         pass
-    fig_cr.update_layout(template="plotly_white", height=380,
-                         yaxis_title="OAS (bps)",
-                         annotations=[dict(
-                             text="Source: ICE BofA via FRED",
-                             xref="paper", yref="paper",
-                             x=1, y=-0.12, showarrow=False,
-                             font=dict(size=11, color="#888"), xanchor="right"
-                         )])
+    fig_cr.update_layout(template="plotly_white", height=380, yaxis_title="bps",
+                         margin=dict(b=60), annotations=[src_ann()])
     st.plotly_chart(fig_cr, use_container_width=True, key="fig_credit")
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -470,6 +530,8 @@ with tab4:
     col_a, col_b = st.columns(2)
     with col_a:
         st.subheader("CPI & Core CPI (YoY %)")
+        st.caption("Year-over-year % change in Consumer Price Index. Core excludes food & energy. "
+                   "Red line = Fed 2% target.")
         fig_cpi = go.Figure()
         for sid, lbl in [("CPIAUCSL", "CPI"), ("CPILFESL", "Core CPI")]:
             try:
@@ -479,11 +541,14 @@ with tab4:
                 pass
         fig_cpi.add_hline(y=2.0, line_dash="dash", line_color="red",
                           annotation_text="Fed 2% target", annotation_position="bottom right")
-        fig_cpi.update_layout(template="plotly_white", height=360, yaxis_title="YoY %")
+        fig_cpi.update_layout(template="plotly_white", height=360, yaxis_title="YoY %",
+                              margin=dict(b=60), annotations=[src_ann()])
         st.plotly_chart(fig_cpi, use_container_width=True, key="fig_cpi")
 
     with col_b:
         st.subheader("PCE & Core PCE (YoY %)")
+        st.caption("Personal Consumption Expenditures price index — the Fed's preferred inflation gauge. "
+                   "Core PCE (ex food & energy) is the primary input to FOMC policy decisions.")
         fig_pce = go.Figure()
         for sid, lbl in [("PCEPI", "PCE"), ("PCEPILFE", "Core PCE")]:
             try:
@@ -493,12 +558,16 @@ with tab4:
                 pass
         fig_pce.add_hline(y=2.0, line_dash="dash", line_color="red",
                           annotation_text="Fed 2% target", annotation_position="bottom right")
-        fig_pce.update_layout(template="plotly_white", height=360, yaxis_title="YoY %")
+        fig_pce.update_layout(template="plotly_white", height=360, yaxis_title="YoY %",
+                              margin=dict(b=60), annotations=[src_ann()])
         st.plotly_chart(fig_pce, use_container_width=True, key="fig_pce")
 
     col_c, col_d = st.columns(2)
     with col_c:
         st.subheader("Fed Funds Rate & Unemployment")
+        st.caption("Fed Funds = overnight rate set by the FOMC, the primary monetary policy lever. "
+                   "Unemployment = U-3 rate. Together these reflect the dual mandate: "
+                   "price stability + maximum employment.")
         fig_ff = go.Figure()
         for sid, lbl, col in [("FEDFUNDS", "Fed Funds Rate", "#1f77b4"),
                                ("UNRATE",   "Unemployment",   "#ff7f0e")]:
@@ -508,11 +577,14 @@ with tab4:
                                             mode="lines", line=dict(color=col, width=2)))
             except Exception:
                 pass
-        fig_ff.update_layout(template="plotly_white", height=360, yaxis_title="%")
+        fig_ff.update_layout(template="plotly_white", height=360, yaxis_title="%",
+                             margin=dict(b=60), annotations=[src_ann()])
         st.plotly_chart(fig_ff, use_container_width=True, key="fig_fedfunds")
 
     with col_d:
         st.subheader("Real GDP Growth (QoQ Annualized %)")
+        st.caption("Quarter-over-quarter change in real GDP, seasonally adjusted annual rate (SAAR). "
+                   "Two consecutive negative quarters = technical recession. Green = expansion, red = contraction.")
         try:
             gdp = trim(fetch_fred_series("A191RL1Q225SBEA"), mmon)
             fig_gdp = go.Figure()
@@ -521,7 +593,8 @@ with tab4:
                 marker_color=["#2ca02c" if v >= 0 else "#d62728" for v in gdp.values]
             ))
             fig_gdp.add_hline(y=0, line_color="black", line_width=1)
-            fig_gdp.update_layout(template="plotly_white", height=360, yaxis_title="% QoQ Ann.")
+            fig_gdp.update_layout(template="plotly_white", height=360, yaxis_title="% QoQ Ann.",
+                                  margin=dict(b=60), annotations=[src_ann()])
             st.plotly_chart(fig_gdp, use_container_width=True, key="fig_gdp")
         except Exception:
             st.info("GDP data unavailable.")
@@ -537,85 +610,88 @@ with tab5:
     future_str = (today + timedelta(days=45)).strftime("%Y-%m-%d")
 
     with st.spinner("Loading calendar data…"):
-        cal_past   = fetch_fmp_calendar(past_str,  today_str)
-        cal_future = fetch_fmp_calendar(today_str, future_str)
+        cal_past,   err_past   = fetch_fmp_calendar(past_str,  today_str)
+        cal_future, err_future = fetch_fmp_calendar(today_str, future_str)
 
     col_left, col_right = st.columns([3, 1])
 
     with col_left:
 
-        # ── TABLE 1: UPCOMING ──────────────────────────────────────────────
+        # ── TABLE 1: UPCOMING ─────────────────────────────────────────────
         st.subheader("📅 Upcoming Releases")
-        st.caption("Next 45 days  •  Consensus estimates where available")
+        st.caption("Next 45 days · Consensus estimates from FMP where available")
 
-        if not cal_future.empty:
-            up = cal_future.copy()
-            up = up[up["actual"].isna() | (up["actual"] == "")]
-            up["Date"]      = up["date"].dt.strftime("%b %d, %Y")
-            up["Event"]     = up.get("event",    "")
-            up["Estimate"]  = up.get("estimate", pd.Series(dtype=float))
-            up["Previous"]  = up.get("previous", pd.Series(dtype=float))
-            up["Unit"]      = up.get("unit",     "")
-
-            display_up = up[["Date", "Event", "Estimate", "Previous", "Unit"]].copy()
-            display_up = display_up[display_up["Event"].str.strip() != ""]
-            display_up = display_up.reset_index(drop=True)
-
-            st.dataframe(display_up, hide_index=True, use_container_width=True, height=380)
+        if err_future:
+            st.warning(f"FMP error: {err_future}. Check your FMP_API_KEY in Streamlit secrets.")
+        elif cal_future.empty:
+            st.info("No upcoming data returned from FMP.")
         else:
-            st.info("No upcoming release data available.")
+            up = cal_future.copy()
+            if "actual" in up.columns:
+                up = up[up["actual"].apply(is_null_actual)]
+            up["Date"]     = up["date"].dt.strftime("%b %d, %Y")
+            up["Event"]    = up.get("event",    pd.Series(dtype=str)).fillna("")
+            up["Estimate"] = up.get("estimate", pd.Series(dtype=float))
+            up["Previous"] = up.get("previous", pd.Series(dtype=float))
+            up["Unit"]     = up.get("unit",     pd.Series(dtype=str)).fillna("")
+            disp_up = up[["Date", "Event", "Estimate", "Previous", "Unit"]]
+            disp_up = disp_up[disp_up["Event"].str.strip() != ""].reset_index(drop=True)
+            if disp_up.empty:
+                st.info("No upcoming events with data found.")
+            else:
+                st.dataframe(disp_up, hide_index=True, use_container_width=True, height=400)
 
         st.divider()
 
-        # ── TABLE 2: PAST RELEASES ─────────────────────────────────────────
+        # ── TABLE 2: PAST RELEASES ────────────────────────────────────────
         st.subheader("📋 Past Releases — Last 35 Days")
-        st.caption("Actual vs consensus estimate  •  Beat ✅  Miss ❌  In-line ➖")
+        st.caption("Actual vs consensus estimate · Beat ✅  Miss ❌  In-line ➖ · "
+                   "MoM Chg = % change of actual vs prior reading")
 
-        if not cal_past.empty:
+        if err_past:
+            st.warning(f"FMP error: {err_past}. Check your FMP_API_KEY in Streamlit secrets.")
+        elif cal_past.empty:
+            st.info("No past release data returned from FMP.")
+        else:
             ps = cal_past.copy()
-            ps = ps[ps["actual"].notna() & (ps["actual"] != "")]
+            if "actual" in ps.columns:
+                ps = ps[~ps["actual"].apply(is_null_actual)]
             ps["Date"]     = ps["date"].dt.strftime("%b %d, %Y")
-            ps["Event"]    = ps.get("event",    "")
-            ps["Actual"]   = pd.to_numeric(ps.get("actual",   None), errors="coerce")
-            ps["Estimate"] = pd.to_numeric(ps.get("estimate", None), errors="coerce")
-            ps["Previous"] = pd.to_numeric(ps.get("previous", None), errors="coerce")
-            ps["Unit"]     = ps.get("unit", "")
+            ps["Event"]    = ps.get("event",    pd.Series(dtype=str)).fillna("")
+            ps["Actual"]   = pd.to_numeric(ps.get("actual",   pd.Series(dtype=float)), errors="coerce")
+            ps["Estimate"] = pd.to_numeric(ps.get("estimate", pd.Series(dtype=float)), errors="coerce")
+            ps["Previous"] = pd.to_numeric(ps.get("previous", pd.Series(dtype=float)), errors="coerce")
+            ps["Unit"]     = ps.get("unit", pd.Series(dtype=str)).fillna("")
 
-            # MoM % change: actual vs previous
             ps["MoM Chg"] = np.where(
                 ps["Previous"].notna() & (ps["Previous"] != 0),
                 ((ps["Actual"] - ps["Previous"]) / ps["Previous"].abs() * 100).round(2),
                 np.nan
             )
-            ps["MoM Chg"] = ps["MoM Chg"].apply(
-                lambda x: f"{x:+.2f}%" if pd.notna(x) else "—"
-            )
+            ps["MoM Chg"] = ps["MoM Chg"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "—")
 
-            # Beat / Miss vs estimate
             def beat_miss(row):
                 try:
-                    a, e = float(row["Actual"]), float(row["Estimate"])
-                    diff = abs(a - e)
-                    threshold = abs(e) * 0.02 if e != 0 else 0.05
-                    if diff <= threshold:  return "➖ In-line"
+                    a, e  = float(row["Actual"]), float(row["Estimate"])
+                    diff  = abs(a - e)
+                    thresh = abs(e) * 0.02 if e != 0 else 0.05
+                    if diff <= thresh: return "➖ In-line"
                     return "✅ Beat" if a > e else "❌ Miss"
                 except Exception:
                     return "—"
             ps["Beat / Miss"] = ps.apply(beat_miss, axis=1)
 
-            display_ps = ps[["Date", "Event", "Previous", "Estimate",
-                              "Actual", "MoM Chg", "Beat / Miss", "Unit"]].copy()
-            display_ps = display_ps[display_ps["Event"].str.strip() != ""]
-            display_ps = display_ps.sort_values("Date", ascending=False).reset_index(drop=True)
+            disp_ps = ps[["Date", "Event", "Previous", "Estimate", "Actual",
+                           "MoM Chg", "Beat / Miss", "Unit"]]
+            disp_ps = disp_ps[disp_ps["Event"].str.strip() != ""]
+            disp_ps = disp_ps.sort_values("Date", ascending=False).reset_index(drop=True)
 
-            st.dataframe(
-                beat_miss_color(display_ps),
-                hide_index=True, use_container_width=True, height=500
-            )
-        else:
-            st.info("No recent release data available.")
+            if disp_ps.empty:
+                st.info("No past releases with actuals found.")
+            else:
+                st.dataframe(beat_miss_color(disp_ps), hide_index=True,
+                             use_container_width=True, height=520)
 
-    # ── FOMC SIDEBAR ──────────────────────────────────────────────────────
     with col_right:
         st.subheader("FOMC Dates")
         today_d = datetime.today().date()
