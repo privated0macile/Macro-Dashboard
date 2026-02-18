@@ -44,6 +44,7 @@ SECTORS = {
 }
 YIELDS  = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
+CREDIT  = {"BAMLH0A0HYM2": "HY OAS", "BAMLC0A0CM": "IG OAS"}
 
 # Key releases to show in macro snapshot table
 KEY_RELEASES = [
@@ -258,6 +259,35 @@ with tab1:
             c[i].metric(label, "N/A")
 
     st.divider()
+
+    # ── Credit spread snapshot ──
+    st.subheader("Credit Spreads (OAS, bps)")
+    cc = st.columns(3)
+    credit_snap = [
+        ("BAMLH0A0HYM2", "HY OAS"),
+        ("BAMLC0A0CM",   "IG OAS"),
+    ]
+    hy_val, ig_val = None, None
+    for i, (sid, label) in enumerate(credit_snap):
+        try:
+            s = fetch_fred_series(sid)
+            cur, prev = s.iloc[-1], s.iloc[-2]
+            if label == "HY OAS": hy_val = cur
+            if label == "IG OAS": ig_val = cur
+            cc[i].metric(label, f"{cur:.0f} bps", f"{cur - prev:+.0f} bps")
+        except Exception:
+            cc[i].metric(label, "N/A")
+    if hy_val and ig_val:
+        gap = hy_val - ig_val
+        try:
+            hy_s = fetch_fred_series("BAMLH0A0HYM2")
+            ig_s = fetch_fred_series("BAMLC0A0CM")
+            prev_gap = hy_s.iloc[-2] - ig_s.iloc[-2]
+            cc[2].metric("HY–IG Gap", f"{gap:.0f} bps", f"{gap - prev_gap:+.0f} bps")
+        except Exception:
+            cc[2].metric("HY–IG Gap", f"{gap:.0f} bps")
+
+    st.divider()
     col_l, col_r = st.columns(2)
 
     with col_l:
@@ -399,6 +429,35 @@ with tab3:
         st.plotly_chart(fig_rv, use_container_width=True, key="fig_realyield")
 
     st.plotly_chart(build_yield_curve(), use_container_width=True, key="yc_rates")
+
+    st.divider()
+    st.subheader("Credit Spreads (OAS, bps)")
+    fig_cr = go.Figure()
+    for sid, lbl in CREDIT.items():
+        try:
+            s = trim(fetch_fred_series(sid), rmons)
+            fig_cr.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
+        except Exception:
+            pass
+    # HY–IG gap
+    try:
+        hy = trim(fetch_fred_series("BAMLH0A0HYM2"), rmons)
+        ig = trim(fetch_fred_series("BAMLC0A0CM"),   rmons)
+        gap = hy - ig
+        gap = gap.dropna()
+        fig_cr.add_trace(go.Scatter(x=gap.index, y=gap.values, name="HY–IG Gap",
+                                    mode="lines", line=dict(dash="dot", width=1.5)))
+    except Exception:
+        pass
+    fig_cr.update_layout(template="plotly_white", height=380,
+                         yaxis_title="OAS (bps)",
+                         annotations=[dict(
+                             text="Source: ICE BofA via FRED",
+                             xref="paper", yref="paper",
+                             x=1, y=-0.12, showarrow=False,
+                             font=dict(size=11, color="#888"), xanchor="right"
+                         )])
+    st.plotly_chart(fig_cr, use_container_width=True, key="fig_credit")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 4 — MACRO
