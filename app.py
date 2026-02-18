@@ -676,7 +676,8 @@ with tab5:
         with st.spinner("Loading…"):
             snap = fetch_release_snapshot()
         if not snap.empty:
-            st.dataframe(snap.style.apply(snap_color, axis=1),
+            fmt = {"Previous": "{:.2f}", "Latest": "{:.2f}"}
+            st.dataframe(snap.style.apply(snap_color, axis=1).format(fmt),
                          hide_index=True, use_container_width=True, height=420)
 
         st.divider()
