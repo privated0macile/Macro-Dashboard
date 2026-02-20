@@ -786,17 +786,21 @@ with tab2:
             spy_z = compute_volume_zscore(spy_vol)
             spy_z_t = spy_z[spy_z.index >= spy_z.index.max() - pd.DateOffset(months=12)]
             spy_z_now = spy_z_t.iloc[-1]
-            bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in spy_z_t.values]
             fig_sv = go.Figure()
-            fig_sv.add_trace(go.Bar(
+            fig_sv.add_trace(go.Scatter(
                 x=spy_z_t.index, y=spy_z_t.values,
-                marker_color=bar_colors, opacity=0.6, showlegend=False))
+                mode="lines", line=dict(color="#555", width=1.5),
+                fill="tozeroy",
+                fillcolor="rgba(44,160,44,0.25)",
+                showlegend=False))
             fig_sv.add_hline(y=0, line_dash="dash", line_color="gray")
+            fig_sv.add_hline(y=2, line_dash="dot", line_color="#2ca02c", line_width=0.8)
+            fig_sv.add_hline(y=-2, line_dash="dot", line_color="#d62728", line_width=0.8)
             fig_sv.update_layout(
                 title=dict(text=(
                     f"<b>SPY Volume</b> — {spy_z_now:+.2f}σ<br>"
                     f"<span style='font-size:11px;color:#666'>"
-                    f"252d z-score · green = above avg</span>"),
+                    f"252d z-score · dotted at ±2</span>"),
                     font=dict(size=12)),
                 template="plotly_white", height=280, yaxis_title="Z-Score",
                 yaxis=dict(range=[-3.5, 3.5]),
