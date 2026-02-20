@@ -430,6 +430,7 @@ def build_positioning_table(prices, volumes, asset_dict, period_start):
             if len(p) < 2:
                 continue
             ret_1d = p.pct_change().iloc[-1] * 100
+            ret_5d = ((p.iloc[-1] / p.iloc[-5]) - 1) * 100 if len(p) >= 5 else np.nan
             p_trim = p[p.index >= pd.Timestamp(period_start)]
             idx_ret = ((p_trim.iloc[-1] / p_trim.iloc[0]) - 1) * 100 if len(p_trim) > 1 else np.nan
             fz = compute_flow_proxy_z(prices, volumes, tkr)
@@ -445,14 +446,16 @@ def build_positioning_table(prices, volumes, asset_dict, period_start):
             composite = round(np.mean(components), 2) if components else np.nan
             rows.append({
                 "Ticker": tkr, "Name": name,
-                "1D Ret %": round(ret_1d, 2), "Period Ret %": round(idx_ret, 2),
+                "1D Ret %": round(ret_1d, 2),
+                "5D Ret %": round(ret_5d, 2) if not np.isnan(ret_5d) else np.nan,
+                "Period Ret %": round(idx_ret, 2),
                 "Flow Z": flow_z, "Signed Vol Z": svol_z, "Composite": composite
             })
         except Exception:
             continue
     df = pd.DataFrame(rows)
     if not df.empty:
-        df = df.sort_values("Flow Z", ascending=False).reset_index(drop=True)
+        df = df.sort_values("5D Ret %", ascending=False).reset_index(drop=True)
     return df
 
 def style_positioning_table(df):
@@ -470,14 +473,14 @@ def style_positioning_table(df):
     for c in ["Flow Z", "Signed Vol Z", "Composite"]:
         if c in df.columns:
             styler = styler.map(_color_z, subset=[c])
-    for c in ["1D Ret %", "Period Ret %"]:
+    for c in ["1D Ret %", "5D Ret %", "Period Ret %"]:
         if c in df.columns:
             styler = styler.map(_color_ret, subset=[c])
-    styler = styler.format({
-        "1D Ret %": "{:+.2f}", "Period Ret %": "{:+.2f}",
-        "Flow Z": "{:+.2f}", "Signed Vol Z": "{:+.2f}",
-        "Composite": "{:+.2f}"
-    }, na_rep="—")
+    fmt = {}
+    for c in ["1D Ret %", "5D Ret %", "Period Ret %", "Flow Z", "Signed Vol Z", "Composite"]:
+        if c in df.columns:
+            fmt[c] = "{:+.2f}"
+    styler = styler.format(fmt, na_rep="—")
     return styler
 
 def style_attribution_table(df):
@@ -492,44 +495,6 @@ def style_attribution_table(df):
         "5D Ret %": "{:+.2f}", "1M Ret %": "{:+.2f}",
     }, na_rep="—")
     return styler
-
-def build_volume_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
-    if ticker not in prices.columns or ticker not in volumes.columns:
-        return None
-    p = prices[ticker].dropna()
-    v = volumes[ticker].dropna()
-    cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
-    p, v = p[p.index >= cutoff], v[v.index >= cutoff]
-    if len(p) < 10:
-        return None
-    p_idx = p / p.iloc[0]
-    z_full = compute_volume_zscore(volumes[ticker].dropna())
-    z = z_full[z_full.index >= cutoff]
-    common = p_idx.index.intersection(z.index)
-    p_idx, z = p_idx.loc[common], z.loc[common]
-    bar_colors = ["#2ca02c" if val >= 0 else "#d62728" for val in z.values]
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(x=z.index, y=z.values, name="Vol Z",
-                         marker_color=bar_colors, opacity=0.35), secondary_y=True)
-    fig.add_trace(go.Scatter(x=p_idx.index, y=p_idx.values, name=f"{label}",
-                             mode="lines", line=dict(color="#1f77b4", width=2.5)),
-                  secondary_y=False)
-    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=1,
-                  secondary_y=False)
-    fig.update_layout(
-        title=dict(text=(f"<b>{label}</b> ({ticker})<br>"
-                         f"<span style='font-size:12px;color:#666'>"
-                         f"Price indexed · Vol z-score (252d) ±3</span>"),
-                   font=dict(size=14)),
-        template="plotly_white", height=340,
-        margin=dict(b=60, t=70, l=55, r=45),
-        legend=dict(orientation="h", yanchor="top", y=-0.18,
-                    x=0.5, xanchor="center", font=dict(size=10)),
-        dragmode=False, bargap=0.1, annotations=[src_ann(-0.25)])
-    fig.update_yaxes(title_text="Indexed", secondary_y=False)
-    fig.update_yaxes(title_text="Vol Z", secondary_y=True,
-                     range=[-3.5, 3.5], dtick=1, showgrid=False)
-    return fig
 
 # ─── YIELD / MACRO HELPERS ──────────────────────────────────────────────────
 
