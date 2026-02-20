@@ -496,6 +496,46 @@ def style_attribution_table(df):
     }, na_rep="—")
     return styler
 
+def build_volume_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
+    """Kept for compatibility — dual-axis price + volume z-score."""
+    if ticker not in prices.columns or ticker not in volumes.columns:
+        return None
+    p = prices[ticker].dropna()
+    cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
+    p = p[p.index >= cutoff]
+    if len(p) < 10:
+        return None
+    p_idx = p / p.iloc[0]
+    z_full = compute_volume_zscore(volumes[ticker].dropna())
+    z = z_full[z_full.index >= cutoff]
+    common = p_idx.index.intersection(z.index)
+    p_idx, z = p_idx.loc[common], z.loc[common]
+    if len(common) < 5:
+        return None
+    bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in z.values]
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.add_trace(go.Bar(x=z.index, y=z.values, name="Vol Z",
+                         marker_color=bar_colors, opacity=0.35), secondary_y=True)
+    fig.add_trace(go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
+                             mode="lines", line=dict(color="#1f77b4", width=2.5)),
+                  secondary_y=False)
+    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=1,
+                  secondary_y=False)
+    fig.update_layout(
+        title=dict(text=(f"<b>{label}</b> ({ticker})<br>"
+                         f"<span style='font-size:12px;color:#666'>"
+                         f"Indexed price · Vol z-score (252d) ±3</span>"),
+                   font=dict(size=14)),
+        template="plotly_white", height=340,
+        margin=dict(b=60, t=70, l=55, r=45),
+        legend=dict(orientation="h", yanchor="top", y=-0.18,
+                    x=0.5, xanchor="center", font=dict(size=10)),
+        dragmode=False, bargap=0.1, annotations=[src_ann(-0.25)])
+    fig.update_yaxes(title_text="Indexed", secondary_y=False)
+    fig.update_yaxes(title_text="Vol Z", secondary_y=True,
+                     range=[-3.5, 3.5], dtick=1, showgrid=False)
+    return fig
+
 # ─── YIELD / MACRO HELPERS ──────────────────────────────────────────────────
 
 def yield_curve_commentary():
