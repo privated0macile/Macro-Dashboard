@@ -255,22 +255,6 @@ def fetch_release_snapshot():
             })
         except Exception:
             continue
-    # Append next FOMC as a row
-    today_d = datetime.today().date()
-    all_fomc = FOMC.get("2025", []) + FOMC.get("2026", [])
-    nxt = next(((l, d) for l, d in all_fomc
-                if datetime.strptime(d, "%Y-%m-%d").date() >= today_d), None)
-    if nxt:
-        lbl, d = nxt
-        days_away = (datetime.strptime(d, "%Y-%m-%d").date() - today_d).days
-        rows.append({
-            "Release": f"FOMC ({lbl})",
-            "Last Updated": "—",
-            "Previous": "—",
-            "Latest": f"{days_away}d away",
-            "Unit": "",
-            "Next Release": pd.Timestamp(d).strftime("%b %d, %Y")
-        })
     return pd.DataFrame(rows)
 
 @st.cache_data(ttl=1800)
@@ -696,16 +680,26 @@ with tab1:
         if c:
             st.caption(c)
     with col_r:
-        st.subheader("Key Releases & FOMC")
+        st.subheader("Key Releases")
         try:
             snap = fetch_release_snapshot()
             if not snap.empty:
                 st.dataframe(
                     snap[["Release", "Next Release", "Latest", "Unit"]]
-                    .style.apply(snap_color, axis=1),
-                    hide_index=True, use_container_width=True, height=420)
+                    .style.apply(snap_color, axis=1)
+                    .format({"Latest": safe_fmt}, na_rep="—"),
+                    hide_index=True, use_container_width=True, height=380)
         except Exception:
             st.info("Release data unavailable.")
+        # Next FOMC inline
+        all_fomc = FOMC["2025"] + FOMC["2026"]
+        today_d = datetime.today().date()
+        nxt = next(((l, d) for l, d in all_fomc
+                    if datetime.strptime(d, "%Y-%m-%d").date() >= today_d), None)
+        if nxt:
+            lbl, d = nxt
+            days_away = (datetime.strptime(d, "%Y-%m-%d").date() - today_d).days
+            st.caption(f"**Next FOMC:** {lbl} — {days_away} days away")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — MARKETS
