@@ -719,8 +719,9 @@ with tab2:
         "Flow Z = residual dollar-volume change (accumulation/distribution) · "
         "Signed Vol Z = directional participation · "
         "Composite = (Flow Z + Signed Vol Z + Return Z) / 3 · "
-        "All 63-day rolling, clipped ±3. Sorted by Flow Z desc.")
+        "All 63-day rolling, clipped ±3.")
 
+    # ── Regime headline metrics ──
     regime_cols = st.columns(4)
     try:
         ri = compute_retail_intensity(volumes)
@@ -762,29 +763,137 @@ with tab2:
     except Exception:
         regime_cols[3].metric("Sector Dispersion", "N/A")
 
-    pos_period = st.radio(
-        "Index period", ["1M", "3M", "6M", "YTD"],
-        horizontal=True, key="pos_period")
+    # ── Build positioning data for charts ──
+    pos_freq = st.radio(
+        "Return period", ["1D", "1W", "1M", "YTD"],
+        horizontal=True, key="pos_freq")
     pos_latest = prices.index.max()
-    if pos_period == "YTD":
-        pos_start = f"{pos_latest.year}-01-01"
+    if pos_freq == "1D":
+        pos_start = (pos_latest - pd.tseries.offsets.BDay(1)).strftime("%Y-%m-%d")
+    elif pos_freq == "1W":
+        pos_start = (pos_latest - pd.tseries.offsets.BDay(5)).strftime("%Y-%m-%d")
+    elif pos_freq == "1M":
+        pos_start = (pos_latest - pd.DateOffset(months=1)).strftime("%Y-%m-%d")
     else:
-        m = {"1M": 1, "3M": 3, "6M": 6}[pos_period]
-        pos_start = (pos_latest - pd.DateOffset(months=m)).strftime("%Y-%m-%d")
+        pos_start = f"{pos_latest.year}-01-01"
 
-    ptab_sec, ptab_fac = st.columns(2)
-    with ptab_sec:
-        st.markdown("**Sectors**")
-        df_sec = build_positioning_table(prices, volumes, SECTORS, pos_start)
-        if not df_sec.empty:
-            st.dataframe(style_positioning_table(df_sec),
-                         hide_index=True, use_container_width=True, height=400)
-    with ptab_fac:
-        st.markdown("**Factors**")
-        df_fac = build_positioning_table(prices, volumes, FACTORS, pos_start)
-        if not df_fac.empty:
-            st.dataframe(style_positioning_table(df_fac),
-                         hide_index=True, use_container_width=True, height=400)
+    df_sec = build_positioning_table(prices, volumes, SECTORS, pos_start)
+    df_fac = build_positioning_table(prices, volumes, FACTORS, pos_start)
+    df_all = pd.concat([df_sec, df_fac], ignore_index=True)
+
+    # ── Summary: top/bottom movers ──
+    if not df_all.empty and "Composite" in df_all.columns:
+        df_ranked = df_all.dropna(subset=["Composite"]).sort_values("Composite", ascending=False)
+        top3 = df_ranked.head(3)
+        bot3 = df_ranked.tail(3).iloc[::-1]  # worst first
+
+        sum_l, sum_r = st.columns(2)
+        with sum_l:
+            st.markdown("**🟢 Strongest Positioning (Top 3)**")
+            if not top3.empty:
+                st.dataframe(
+                    style_positioning_table(
+                        top3[["Ticker", "Name", "1D Ret %", "Period Ret %",
+                              "Flow Z", "Signed Vol Z", "Composite"]].reset_index(drop=True)),
+                    hide_index=True, use_container_width=True, height=145)
+        with sum_r:
+            st.markdown("**🔴 Weakest Positioning (Bottom 3)**")
+            if not bot3.empty:
+                st.dataframe(
+                    style_positioning_table(
+                        bot3[["Ticker", "Name", "1D Ret %", "Period Ret %",
+                              "Flow Z", "Signed Vol Z", "Composite"]].reset_index(drop=True)),
+                    hide_index=True, use_container_width=True, height=145)
+
+    # ── Positioning bar charts ──
+    def build_z_bar_chart(df, title_label):
+        """Horizontal grouped bar chart: Flow Z and Signed Vol Z."""
+        if df.empty:
+            return None
+        df_s = df.sort_values("Composite", ascending=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=df_s["Ticker"] + " " + df_s["Name"],
+            x=df_s["Flow Z"], name="Flow Z",
+            orientation="h", marker_color=[
+                "#2ca02c" if v >= 0 else "#d62728" for v in df_s["Flow Z"]],
+            opacity=0.85))
+        fig.add_trace(go.Bar(
+            y=df_s["Ticker"] + " " + df_s["Name"],
+            x=df_s["Signed Vol Z"], name="Signed Vol Z",
+            orientation="h", marker_color=[
+                "#17becf" if v >= 0 else "#e377c2" for v in df_s["Signed Vol Z"]],
+            opacity=0.65))
+        fig.add_vline(x=0, line_color="gray", line_width=1)
+        fig.add_vline(x=2, line_dash="dot", line_color="#2ca02c", line_width=0.8)
+        fig.add_vline(x=-2, line_dash="dot", line_color="#d62728", line_width=0.8)
+        fig.update_layout(
+            title=dict(text=(
+                f"<b>{title_label} Z-Scores</b><br>"
+                f"<span style='font-size:11px;color:#666'>"
+                f"Flow Z (green/red) + Signed Vol Z (cyan/pink) · "
+                f"dotted lines at ±2</span>"),
+                font=dict(size=13)),
+            template="plotly_white",
+            height=max(len(df_s) * 45 + 100, 300),
+            barmode="group", bargap=0.25, bargroupgap=0.1,
+            xaxis_title="Z-Score", xaxis=dict(range=[-3.5, 3.5]),
+            margin=dict(b=60, t=70, l=150, r=30),
+            legend=dict(orientation="h", yanchor="top", y=-0.12,
+                        x=0.5, xanchor="center"),
+            dragmode=False, annotations=[src_ann(-0.15)])
+        return fig
+
+    def build_return_bar_chart(df, title_label, freq_label):
+        """Horizontal bar chart: period return."""
+        if df.empty:
+            return None
+        df_s = df.sort_values("Period Ret %", ascending=True)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            y=df_s["Ticker"] + " " + df_s["Name"],
+            x=df_s["Period Ret %"], name=f"{freq_label} Return",
+            orientation="h",
+            marker_color=["#2ca02c" if v >= 0 else "#d62728"
+                          for v in df_s["Period Ret %"]],
+            showlegend=False))
+        fig.add_vline(x=0, line_color="gray", line_width=1)
+        fig.update_layout(
+            title=dict(text=(
+                f"<b>{title_label} Returns ({freq_label})</b><br>"
+                f"<span style='font-size:11px;color:#666'>"
+                f"Cumulative return over period</span>"),
+                font=dict(size=13)),
+            template="plotly_white",
+            height=max(len(df_s) * 40 + 100, 280),
+            xaxis_title="Return (%)",
+            margin=dict(b=60, t=70, l=150, r=30),
+            dragmode=False, annotations=[src_ann(-0.15)])
+        return fig
+
+    st.divider()
+
+    # Sectors
+    sec_z_col, sec_ret_col = st.columns(2)
+    with sec_z_col:
+        fig = build_z_bar_chart(df_sec, "Sector")
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, key="bar_sec_z", config=PCFG)
+    with sec_ret_col:
+        fig = build_return_bar_chart(df_sec, "Sector", pos_freq)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, key="bar_sec_ret", config=PCFG)
+
+    # Factors
+    fac_z_col, fac_ret_col = st.columns(2)
+    with fac_z_col:
+        fig = build_z_bar_chart(df_fac, "Factor")
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, key="bar_fac_z", config=PCFG)
+    with fac_ret_col:
+        fig = build_return_bar_chart(df_fac, "Factor", pos_freq)
+        if fig:
+            st.plotly_chart(fig, use_container_width=True, key="bar_fac_ret", config=PCFG)
 
     # ── REGIME CHARTS ────────────────────────────────────────────────────────
     st.divider()
