@@ -51,8 +51,8 @@ EW_SECTORS = {
 }
 RETAIL_ETFS = ["TQQQ", "SQQQ"]
 
-# Hardcoded fallback holdings (used when yfinance API fails)
-HOLDINGS_FALLBACK = {
+# Hardcoded holdings (always available as fallback)
+HOLDINGS = {
     "XLK": [
         ("AAPL", "Apple", 0.22), ("MSFT", "Microsoft", 0.21),
         ("NVDA", "Nvidia", 0.11), ("AVGO", "Broadcom", 0.05),
@@ -115,61 +115,34 @@ HOLDINGS_FALLBACK = {
     ],
 }
 
-# Live holdings fetched at runtime (populated by fetch_holdings)
-HOLDINGS = {}
-
-@st.cache_data(ttl=86400)  # 24-hour cache — holdings barely change day-to-day
-def _fetch_etf_holdings(etf_ticker, top_n=10):
-    """
-    Pull top holdings from yfinance funds_data.
-    Returns list of (ticker, name, weight) tuples, or None on failure.
-    """
+@st.cache_data(ttl=86400)
+def fetch_live_holdings(etf_ticker, top_n=10):
+    """Try to pull live holdings from yfinance. Returns list or None."""
     try:
         t = yf.Ticker(etf_ticker)
-        df = t.funds_data.top_holdings
+        fd = t.funds_data
+        if fd is None:
+            return None
+        df = fd.top_holdings
         if df is None or df.empty:
             return None
-        # df index = ticker symbols, column "Holding Percent" (as decimal)
-        # Some yfinance versions use different column names
-        wt_col = None
-        for c in df.columns:
-            if "percent" in c.lower() or "weight" in c.lower():
-                wt_col = c
-                break
-        if wt_col is None and len(df.columns) >= 1:
-            wt_col = df.columns[0]  # best guess: first numeric column
-        if wt_col is None:
-            return None
         result = []
-        for tkr_raw in df.index[:top_n]:
-            tkr = str(tkr_raw).strip()
-            wt = float(df.loc[tkr_raw, wt_col])
-            # yfinance sometimes returns % as 0–100, sometimes 0–1
+        for idx_val in df.index[:top_n]:
+            tkr = str(idx_val).strip()
+            wt = float(df.iloc[df.index.get_loc(idx_val), 0])
             if wt > 1:
                 wt = wt / 100.0
-            # Try to get a short name
-            name = tkr  # default
-            try:
-                nm_col = [c for c in df.columns if "name" in c.lower()]
-                if nm_col:
-                    name = str(df.loc[tkr_raw, nm_col[0]])
-            except Exception:
-                pass
-            result.append((tkr, name, round(wt, 4)))
-        return result if result else None
+            result.append((tkr, tkr, round(wt, 4)))
+        return result if len(result) >= 3 else None
     except Exception:
         return None
 
-def fetch_all_holdings():
-    """Populate HOLDINGS dict: try live data, fall back to hardcoded."""
-    global HOLDINGS
-    HOLDINGS = {}
-    for etf in SECTORS:
-        live = _fetch_etf_holdings(etf)
-        if live and len(live) >= 3:
-            HOLDINGS[etf] = live
-        elif etf in HOLDINGS_FALLBACK:
-            HOLDINGS[etf] = HOLDINGS_FALLBACK[etf]
+def get_holdings(etf_ticker):
+    """Return holdings for an ETF: try live, fall back to hardcoded."""
+    live = fetch_live_holdings(etf_ticker)
+    if live:
+        return live, True
+    return HOLDINGS.get(etf_ticker, []), False
 
 YIELDS = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
@@ -217,15 +190,8 @@ def fetch_fred_series(series_id, start=START):
 
 @st.cache_data(ttl=3600)
 def fetch_equity():
-    # Populate HOLDINGS from live data (with fallback)
-    fetch_all_holdings()
     holding_tickers = []
     for etf, stocks in HOLDINGS.items():
-        for tkr, _, _ in stocks:
-            holding_tickers.append(tkr)
-    # Also include fallback tickers so they're available even if live fetch
-    # returns different symbols on a later cache cycle
-    for etf, stocks in HOLDINGS_FALLBACK.items():
         for tkr, _, _ in stocks:
             holding_tickers.append(tkr)
     tickers = (list(FACTORS.keys()) + list(SECTORS.keys())
@@ -434,9 +400,10 @@ def compute_rotation_ratio(prices, smooth=21, norm_window=252):
     return pct_rank.dropna(), smoothed.dropna()
 
 def build_holdings_attribution(etf_ticker, prices):
-    if etf_ticker not in HOLDINGS:
-        return pd.DataFrame(), np.nan
-    holdings = HOLDINGS[etf_ticker]
+    """Compute daily return attribution for an ETF's top holdings."""
+    holdings, is_live = get_holdings(etf_ticker)
+    if not holdings:
+        return pd.DataFrame(), np.nan, False
     rows = []
     etf_ret = prices[etf_ticker].pct_change().iloc[-1] * 100 if etf_ticker in prices.columns else np.nan
     for tkr, name, wt in holdings:
@@ -458,7 +425,7 @@ def build_holdings_attribution(etf_ticker, prices):
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values("Contribution", key=abs, ascending=False).reset_index(drop=True)
-    return df, etf_ret
+    return df, etf_ret, is_live
 
 def build_positioning_table(prices, volumes, asset_dict, period_start):
     rows = []
@@ -617,13 +584,18 @@ def build_yield_curve():
         dragmode=False, annotations=[src_ann(-0.18)])
     return fig
 
+def safe_fmt(val):
+    """Format numeric values to 2dp, pass strings through unchanged."""
+    try:
+        return f"{float(val):.2f}"
+    except (ValueError, TypeError):
+        return str(val)
+
 def snap_color(row):
     styles = [""] * len(row)
     try:
         cols = list(row.index)
-        l_str, p_str = str(row["Latest"]), str(row["Previous"])
-        # Skip non-numeric rows (like FOMC)
-        l, p = float(l_str), float(p_str)
+        l, p = float(row["Latest"]), float(row["Previous"])
         idx = cols.index("Latest")
         styles[idx] = ("color:#2ca02c;font-weight:bold" if l > p
                        else "color:#d62728;font-weight:bold" if l < p else "")
@@ -819,44 +791,6 @@ with tab2:
         if not df_fac.empty:
             st.dataframe(style_positioning_table(df_fac),
                          hide_index=True, use_container_width=True, height=400)
-
-    # ── ETF HOLDINGS DRILL-DOWN ──────────────────────────────────────────────
-    st.divider()
-    st.subheader("Sector ETF Holdings & Daily Attribution")
-    # Show data source status
-    live_count = sum(1 for etf in SECTORS if etf in HOLDINGS
-                     and HOLDINGS.get(etf) != HOLDINGS_FALLBACK.get(etf))
-    fb_count = len(SECTORS) - live_count
-    src_note = f"Weights: {live_count} live via yfinance" if live_count else "Weights: fallback (static)"
-    if fb_count and live_count:
-        src_note += f", {fb_count} fallback"
-    st.caption(
-        "Expand any sector to see top holdings, weight, daily return, "
-        f"and contribution (weight × return). Sorted by |contribution|. {src_note}.")
-
-    exp_cols = st.columns(2)
-    for i, (tkr, name) in enumerate(SECTORS.items()):
-        with exp_cols[i % 2]:
-            with st.expander(f"**{name}** ({tkr})"):
-                try:
-                    df_attr, etf_ret = build_holdings_attribution(tkr, prices)
-                    if not df_attr.empty:
-                        explained = df_attr["Contribution"].sum()
-                        if etf_ret and abs(etf_ret) > 0.001:
-                            st.caption(
-                                f"ETF 1D: **{etf_ret:+.2f}%** · "
-                                f"Top holdings explain: **{explained:+.3f}%** "
-                                f"({explained/etf_ret*100:.0f}%)")
-                        else:
-                            st.caption(f"ETF 1D: **{etf_ret:+.2f}%**")
-                        st.dataframe(
-                            style_attribution_table(df_attr),
-                            hide_index=True, use_container_width=True,
-                            height=min(35 * len(df_attr) + 38, 340))
-                    else:
-                        st.info("Holdings data unavailable.")
-                except Exception:
-                    st.info("Holdings data unavailable.")
 
     # ── REGIME CHARTS ────────────────────────────────────────────────────────
     st.divider()
@@ -1066,6 +1000,39 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True,
                                 key=f"vol_{tkr}", config=PCFG)
 
+    # ── ETF HOLDINGS DRILL-DOWN ──────────────────────────────────────────────
+    st.divider()
+    st.subheader("Sector ETF Holdings & Daily Attribution")
+    st.caption(
+        "Expand any sector to see top holdings, weight, daily return, "
+        "and contribution (weight × return). Sorted by |contribution|. "
+        "Weights sourced live from yfinance when available, otherwise static fallback.")
+
+    exp_cols = st.columns(2)
+    for i, (tkr, name) in enumerate(SECTORS.items()):
+        with exp_cols[i % 2]:
+            with st.expander(f"**{name}** ({tkr})"):
+                try:
+                    df_attr, etf_ret, is_live = build_holdings_attribution(tkr, prices)
+                    src_tag = "🟢 live" if is_live else "⚪ static"
+                    if not df_attr.empty:
+                        explained = df_attr["Contribution"].sum()
+                        if etf_ret and abs(etf_ret) > 0.001:
+                            st.caption(
+                                f"ETF 1D: **{etf_ret:+.2f}%** · "
+                                f"Top holdings explain: **{explained:+.3f}%** "
+                                f"({explained/etf_ret*100:.0f}%) · {src_tag}")
+                        else:
+                            st.caption(f"ETF 1D: **{etf_ret:+.2f}%** · {src_tag}")
+                        st.dataframe(
+                            style_attribution_table(df_attr),
+                            hide_index=True, use_container_width=True,
+                            height=min(35 * len(df_attr) + 38, 340))
+                    else:
+                        st.info("Holdings data unavailable.")
+                except Exception:
+                    st.info("Holdings data unavailable.")
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — RATES & MACRO
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1246,9 +1213,9 @@ with tab4:
         with st.spinner("Loading…"):
             snap = fetch_release_snapshot()
             if not snap.empty:
-                fmt = {"Previous": "{:.2f}", "Latest": "{:.2f}"}
                 st.dataframe(
-                    snap.style.apply(snap_color, axis=1).format(fmt, na_rep="—"),
+                    snap.style.apply(snap_color, axis=1)
+                        .format({"Previous": safe_fmt, "Latest": safe_fmt}, na_rep="—"),
                     hide_index=True, use_container_width=True, height=420)
 
         st.divider()
