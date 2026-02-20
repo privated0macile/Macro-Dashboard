@@ -176,8 +176,8 @@ FOMC = {
     ]
 }
 
-ZSCORE_LOOKBACK = 63
-CHART_WINDOW = 63
+ZSCORE_LOOKBACK = 252  # 1 year of trading days
+CHART_WINDOW = 63     # 3-month display window for charts
 
 # ─── DATA FETCHERS ───────────────────────────────────────────────────────────
 
@@ -321,8 +321,8 @@ def chart_title(main, sub):
 # ─── VOLUME & POSITIONING HELPERS ────────────────────────────────────────────
 
 def compute_volume_zscore(vol_series, lookback=ZSCORE_LOOKBACK):
-    rm = vol_series.rolling(lookback, min_periods=20).mean()
-    rs = vol_series.rolling(lookback, min_periods=20).std()
+    rm = vol_series.rolling(lookback, min_periods=60).mean()
+    rs = vol_series.rolling(lookback, min_periods=60).std()
     return ((vol_series - rm) / rs).clip(-3, 3)
 
 def compute_flow_proxy_z(prices, volumes, ticker, lookback=ZSCORE_LOOKBACK):
@@ -335,8 +335,8 @@ def compute_flow_proxy_z(prices, volumes, ticker, lookback=ZSCORE_LOOKBACK):
     dv = p * v
     ret = p.pct_change()
     flow = dv.diff() - (ret * dv.shift(1))
-    rm = flow.rolling(lookback, min_periods=20).mean()
-    rs = flow.rolling(lookback, min_periods=20).std()
+    rm = flow.rolling(lookback, min_periods=60).mean()
+    rs = flow.rolling(lookback, min_periods=60).std()
     return ((flow - rm) / rs).clip(-3, 3)
 
 def compute_signed_volume_z(prices, volumes, ticker, lookback=ZSCORE_LOOKBACK):
@@ -347,8 +347,8 @@ def compute_signed_volume_z(prices, volumes, ticker, lookback=ZSCORE_LOOKBACK):
     common = p.index.intersection(v.index)
     p, v = p.loc[common], v.loc[common]
     sv = v * np.sign(p.pct_change())
-    rm = sv.rolling(lookback, min_periods=20).mean()
-    rs = sv.rolling(lookback, min_periods=20).std()
+    rm = sv.rolling(lookback, min_periods=60).mean()
+    rs = sv.rolling(lookback, min_periods=60).std()
     return ((sv - rm) / rs).clip(-3, 3)
 
 def compute_retail_intensity(volumes, lookback=ZSCORE_LOOKBACK):
@@ -362,8 +362,8 @@ def compute_retail_intensity(volumes, lookback=ZSCORE_LOOKBACK):
     tqqq, sqqq, qqq = tqqq.loc[common], sqqq.loc[common], qqq.loc[common]
     qqq = qqq.replace(0, np.nan)
     ratio = (tqqq + sqqq) / qqq
-    rm = ratio.rolling(lookback, min_periods=20).mean()
-    rs = ratio.rolling(lookback, min_periods=20).std()
+    rm = ratio.rolling(lookback, min_periods=60).mean()
+    rs = ratio.rolling(lookback, min_periods=60).std()
     return ((ratio - rm) / rs).clip(-3, 3)
 
 def compute_breadth(prices):
@@ -437,8 +437,8 @@ def build_positioning_table(prices, volumes, asset_dict, period_start):
             svz = compute_signed_volume_z(prices, volumes, tkr)
             svol_z = round(svz.iloc[-1], 2) if len(svz) > 0 else np.nan
             ret_series = p.pct_change()
-            ret_rm = ret_series.rolling(63, min_periods=20).mean()
-            ret_rs = ret_series.rolling(63, min_periods=20).std()
+            ret_rm = ret_series.rolling(ZSCORE_LOOKBACK, min_periods=60).mean()
+            ret_rs = ret_series.rolling(ZSCORE_LOOKBACK, min_periods=60).std()
             ret_z_val = float(np.clip(
                 (ret_series.iloc[-1] - ret_rm.iloc[-1]) / ret_rs.iloc[-1], -3, 3))
             components = [v for v in [flow_z, svol_z, ret_z_val] if not np.isnan(v)]
@@ -519,7 +519,7 @@ def build_volume_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
     fig.update_layout(
         title=dict(text=(f"<b>{label}</b> ({ticker})<br>"
                          f"<span style='font-size:12px;color:#666'>"
-                         f"Price indexed · Vol z-score (63d) ±3</span>"),
+                         f"Price indexed · Vol z-score (252d) ±3</span>"),
                    font=dict(size=14)),
         template="plotly_white", height=340,
         margin=dict(b=60, t=70, l=55, r=45),
@@ -695,11 +695,9 @@ with tab1:
         try:
             snap = fetch_release_snapshot()
             if not snap.empty:
-                st.dataframe(
-                    snap[["Release", "Next Release", "Latest", "Unit"]]
-                    .style.apply(snap_color, axis=1)
-                    .format({"Latest": safe_fmt}, na_rep="—"),
-                    hide_index=True, use_container_width=True, height=380)
+                display_snap = snap[["Release", "Next Release", "Latest", "Unit"]].copy()
+                st.dataframe(display_snap, hide_index=True,
+                             use_container_width=True, height=380)
         except Exception:
             st.info("Release data unavailable.")
         # Next FOMC inline
@@ -730,7 +728,7 @@ with tab2:
         "Flow Z = residual dollar-volume change (accumulation/distribution) · "
         "Signed Vol Z = directional participation · "
         "Composite = (Flow Z + Signed Vol Z + Return Z) / 3 · "
-        "All 63-day rolling, clipped ±3.")
+        "All 252-day rolling, clipped ±3.")
 
     # ── Regime headline metrics ──
     regime_cols = st.columns(4)
@@ -851,7 +849,7 @@ with tab2:
             title=dict(text=(
                 f"<b>{label}</b> ({ticker})<br>"
                 f"<span style='font-size:12px;color:#666'>"
-                f"Return % from start · Flow z-score (63d) ±3</span>"),
+                f"Return % from start · Flow z-score (252d) ±3</span>"),
                 font=dict(size=14)),
             template="plotly_white", height=340,
             margin=dict(b=60, t=70, l=55, r=45),
@@ -1068,7 +1066,7 @@ with tab2:
     # ── VOLUME Z-SCORE CHARTS ────────────────────────────────────────────────
     st.divider()
     st.subheader("Volume Z-Score & Price (Past 3 Months)")
-    st.caption("Price indexed to 1.0 · Vol z-score (63d) bars clipped ±3 · "
+    st.caption("Price indexed to 1.0 · Vol z-score (252d) bars clipped ±3 · "
                "green = above avg · red = below avg")
 
     st.markdown("#### Factor ETFs")
