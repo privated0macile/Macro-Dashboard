@@ -565,95 +565,65 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Overview", "Markets", "Rates & Macro", "Calendar"]
+tab1, tab2, tab3 = st.tabs(
+    ["Markets", "Rates & Macro", "Calendar"]
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — OVERVIEW
+# TAB 1 — MARKETS
 # ══════════════════════════════════════════════════════════════════════════════
 with tab1:
-    ind_col, idx_col = st.columns([2, 3])
+    with st.spinner("Loading equity data…"):
+        prices, volumes = fetch_equity()
 
-    with ind_col:
-        st.subheader("Key Indicators")
-        row1 = st.columns(3)
-        row2 = st.columns(3)
-        snapshot = [
-            ("DGS2",     "2Y Treasury",   True,  "%"),
-            ("DGS10",    "10Y Treasury",  True,  "%"),
-            ("DGS30",    "30Y Treasury",  True,  "%"),
-            ("FEDFUNDS", "Fed Funds",     False, "%"),
-            ("CPIAUCSL", "CPI YoY",       True,  "%"),
-            ("T10Y2Y",   "10Y–2Y Spread", True,  "%"),
-        ]
-        for i, (sid, label, show_delta, unit) in enumerate(snapshot):
-            col = row1[i] if i < 3 else row2[i - 3]
-            try:
-                s = (to_yoy(fetch_fred_series(sid)) if sid == "CPIAUCSL"
-                     else fetch_fred_series(sid))
-                cur, prev = s.iloc[-1], s.iloc[-2]
-                delta = f"{cur - prev:+.2f}{unit} DoD" if show_delta else None
-                col.metric(label, f"{cur:.2f}{unit}", delta)
-            except Exception:
-                col.metric(label, "N/A")
+    # ── Header: Indices + Key Releases ───────────────────────────────────────
+    hdr_l, hdr_r = st.columns([3, 2])
 
-    with idx_col:
-        st.subheader("Major Indices")
+    with hdr_l:
         idx_period = st.radio(
             "Period", ["1M", "3M", "6M", "YTD", "1Y"],
             horizontal=True, key="idx_period")
-        with st.spinner("Loading index data…"):
-            prices, volumes = fetch_equity()
-            latest = prices.index.max()
-            if idx_period == "YTD":
-                idx_start = pd.Timestamp(f"{latest.year}-01-01")
-            else:
-                months = {"1M": 1, "3M": 3, "6M": 6, "1Y": 12}[idx_period]
-                idx_start = latest - pd.DateOffset(months=months)
-            idx_colors = {
-                "SPY": "#1f77b4", "QQQ": "#ff7f0e",
-                "IWM": "#2ca02c", "DIA": "#d62728"
-            }
-            fig_idx = go.Figure()
-            for tkr, name in INDICES.items():
-                if tkr in prices.columns:
-                    s = prices[tkr].dropna()
-                    s = s[s.index >= idx_start]
-                    if len(s) > 1:
-                        indexed = (s / s.iloc[0] - 1) * 100
-                        fig_idx.add_trace(go.Scatter(
-                            x=indexed.index, y=indexed.values,
-                            name=name, mode="lines",
-                            line=dict(color=idx_colors.get(tkr, "#999"), width=2.5)))
-            fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
-            fig_idx.update_layout(
-                title=chart_title("Index Returns", f"{idx_period} cumulative % return"),
-                template="plotly_white", height=340,
-                yaxis_title="Return (%)",
-                margin=dict(b=80, t=60, l=55, r=40),
-                legend=dict(orientation="h", yanchor="top", y=-0.22,
-                            x=0.5, xanchor="center"),
-                dragmode=False, annotations=[src_ann(-0.28)])
-            st.plotly_chart(fig_idx, use_container_width=True,
-                            key="fig_idx_overview", config=PCFG)
+        latest = prices.index.max()
+        if idx_period == "YTD":
+            idx_start = pd.Timestamp(f"{latest.year}-01-01")
+        else:
+            months = {"1M": 1, "3M": 3, "6M": 6, "1Y": 12}[idx_period]
+            idx_start = latest - pd.DateOffset(months=months)
+        idx_colors = {
+            "SPY": "#1f77b4", "QQQ": "#ff7f0e",
+            "IWM": "#2ca02c", "DIA": "#d62728"
+        }
+        fig_idx = go.Figure()
+        for tkr, name in INDICES.items():
+            if tkr in prices.columns:
+                s = prices[tkr].dropna()
+                s = s[s.index >= idx_start]
+                if len(s) > 1:
+                    indexed = (s / s.iloc[0] - 1) * 100
+                    fig_idx.add_trace(go.Scatter(
+                        x=indexed.index, y=indexed.values,
+                        name=name, mode="lines",
+                        line=dict(color=idx_colors.get(tkr, "#999"), width=2.5)))
+        fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+        fig_idx.update_layout(
+            title=chart_title("Index Returns", f"{idx_period} cumulative % return"),
+            template="plotly_white", height=340,
+            yaxis_title="Return (%)",
+            margin=dict(b=80, t=60, l=55, r=40),
+            legend=dict(orientation="h", yanchor="top", y=-0.22,
+                        x=0.5, xanchor="center"),
+            dragmode=False, annotations=[src_ann(-0.28)])
+        st.plotly_chart(fig_idx, use_container_width=True,
+                        key="fig_idx_overview", config=PCFG)
 
-    st.divider()
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.plotly_chart(build_yield_curve(), use_container_width=True,
-                        key="yc_overview", config=PCFG)
-        c = yield_curve_commentary()
-        if c:
-            st.caption(c)
-    with col_r:
+    with hdr_r:
         st.subheader("Key Releases")
         try:
             snap = fetch_release_snapshot()
             if not snap.empty:
                 display_snap = snap[["Release", "Next Release", "Latest", "Unit"]].copy()
                 st.dataframe(display_snap, hide_index=True,
-                             use_container_width=True, height=380)
+                             use_container_width=True, height=300)
         except Exception:
             st.info("Release data unavailable.")
         all_fomc = FOMC["2025"] + FOMC["2026"]
@@ -665,12 +635,7 @@ with tab1:
             days_away = (datetime.strptime(d, "%Y-%m-%d").date() - today_d).days
             st.caption(f"**Next FOMC:** {lbl} — {days_away} days away")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — MARKETS
-# ══════════════════════════════════════════════════════════════════════════════
-with tab2:
-    with st.spinner("Loading equity data…"):
-        prices, volumes = fetch_equity()
+    st.divider()
 
     period_opts = {
         "Past 12M": None, "Since 2015": "2015-01-01",
@@ -1032,9 +997,31 @@ with tab2:
                     st.info("Holdings data unavailable.")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — RATES & MACRO
+# TAB 2 — RATES & MACRO
 # ══════════════════════════════════════════════════════════════════════════════
-with tab3:
+with tab2:
+    # ── Header: Key rate indicators ──
+    ri1, ri2, ri3, ri4, ri5, ri6 = st.columns(6)
+    rate_snap = [
+        (ri1, "DGS2",     "2Y Treasury",   True,  "%"),
+        (ri2, "DGS10",    "10Y Treasury",  True,  "%"),
+        (ri3, "DGS30",    "30Y Treasury",  True,  "%"),
+        (ri4, "FEDFUNDS", "Fed Funds",     False, "%"),
+        (ri5, "CPIAUCSL", "CPI YoY",       True,  "%"),
+        (ri6, "T10Y2Y",   "10Y–2Y",        True,  "%"),
+    ]
+    for col, sid, label, show_delta, unit in rate_snap:
+        try:
+            s = (to_yoy(fetch_fred_series(sid)) if sid == "CPIAUCSL"
+                 else fetch_fred_series(sid))
+            cur, prev = s.iloc[-1], s.iloc[-2]
+            delta = f"{cur - prev:+.2f}{unit}" if show_delta else None
+            col.metric(label, f"{cur:.2f}{unit}", delta)
+        except Exception:
+            col.metric(label, "N/A")
+
+    st.divider()
+
     rp = st.radio("Period", ["1Y", "3Y", "5Y", "10Y", "Full"],
                   horizontal=True, key="rp")
     rmons = {"1Y": 12, "3Y": 36, "5Y": 60, "10Y": 120, "Full": None}[rp]
@@ -1200,9 +1187,9 @@ with tab3:
             st.info("GDP data unavailable.")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — CALENDAR
+# TAB 3 — CALENDAR
 # ══════════════════════════════════════════════════════════════════════════════
-with tab4:
+with tab3:
     col_left, col_right = st.columns([3, 1])
 
     with col_left:
