@@ -143,6 +143,15 @@ def get_holdings(etf_ticker):
         return live, True
     return HOLDINGS.get(etf_ticker, []), False
 
+SECTORS_CYCLICAL = {
+    "XLK": "Technology", "XLF": "Financials", "XLE": "Energy",
+    "XLI": "Industrials", "XLY": "Cons. Disc.", "XLB": "Materials"
+}
+SECTORS_DEFENSIVE = {
+    "XLV": "Healthcare", "XLP": "Cons. Staples",
+    "XLU": "Utilities", "XLRE": "Real Estate"
+}
+
 YIELDS = {"DGS2": "2Y", "DGS5": "5Y", "DGS10": "10Y", "DGS30": "30Y"}
 SPREADS = {"T10Y2Y": "10Y–2Y Spread", "T10Y3M": "10Y–3M Spread"}
 CREDIT = {"BAMLH0A0HYM2": "HY OAS", "BAMLC0A0CM": "IG OAS"}
@@ -622,11 +631,9 @@ with tab1:
             horizontal=True, key="pos_freq")
         ret_days = {"1D": 1, "5D": 5, "1M": 21, "12M": 252}[pos_freq]
         df_sec = build_positioning_table(prices, volumes, SECTORS, ret_days)
-        df_fac = build_positioning_table(prices, volumes, FACTORS, ret_days)
-        df_all = pd.concat([df_sec, df_fac], ignore_index=True)
 
-        if not df_all.empty and "Composite" in df_all.columns:
-            df_ranked = df_all.dropna(subset=["Composite"]).sort_values(
+        if not df_sec.empty and "Composite" in df_sec.columns:
+            df_ranked = df_sec.dropna(subset=["Composite"]).sort_values(
                 "Composite", ascending=False).reset_index(drop=True)
             top3 = df_ranked.head(3)
             bot3 = df_ranked.tail(3)
@@ -810,66 +817,53 @@ with tab1:
     pf = st.radio("Period", list(period_opts.keys()), horizontal=True, key="pf")
     base = (period_opts[pf] or
             (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d"))
-    rel_f, alpha_f = compute_relative(prices, FACTORS)
-    ri_f = reindex_from(rel_f, base)
-    al_f = alpha_f[alpha_f.index >= pd.Timestamp(base)]
 
-    fig_f1 = go.Figure()
-    for tkr, name in FACTORS.items():
-        if tkr in ri_f.columns:
-            fig_f1.add_trace(go.Scatter(x=ri_f.index, y=ri_f[tkr], name=name, mode="lines"))
-    fig_f1.add_hline(y=1.0, line_dash="dash", line_color="gray")
-    fig_f1.update_layout(
-        title=chart_title("MSCI Factor Relative Performance",
-                          "ETF ÷ SPY, indexed to 1.0 · above = outperforming"),
-        template="plotly_white", height=420,
-        margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
-    st.plotly_chart(fig_f1, use_container_width=True, key="fig_f1", config=PCFG)
+    def _build_pair(asset_dict, group_label, base_date, key_suffix):
+        """Build relative perf (left) + rolling alpha (right) side by side."""
+        rel, alpha = compute_relative(prices, asset_dict)
+        ri = reindex_from(rel, base_date)
+        al = alpha[alpha.index >= pd.Timestamp(base_date)]
 
-    fig_f2 = go.Figure()
-    for tkr, name in FACTORS.items():
-        if tkr in al_f.columns:
-            fig_f2.add_trace(go.Scatter(x=al_f.index, y=al_f[tkr], name=name, mode="lines"))
-    fig_f2.add_hline(y=0.0, line_dash="dash", line_color="gray")
-    fig_f2.update_layout(
-        title=chart_title("MSCI Factor Rolling 6-Month Alpha",
-                          "Compounded 126-day return of relative series"),
-        template="plotly_white", height=420,
-        margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
-    st.plotly_chart(fig_f2, use_container_width=True, key="fig_f2", config=PCFG)
+        cl, cr = st.columns(2)
+        with cl:
+            fig = go.Figure()
+            for tkr, name in asset_dict.items():
+                if tkr in ri.columns:
+                    fig.add_trace(go.Scatter(
+                        x=ri.index, y=ri[tkr], name=name, mode="lines"))
+            fig.add_hline(y=1.0, line_dash="dash", line_color="gray")
+            fig.update_layout(
+                title=chart_title(f"{group_label} Relative Performance",
+                                  "ETF ÷ SPY, indexed to 1.0"),
+                template="plotly_white", height=380,
+                margin=dict(b=90, t=50, l=55, r=30), legend=LEG,
+                dragmode=False, annotations=[src_ann(-0.22)])
+            st.plotly_chart(fig, use_container_width=True,
+                            key=f"rel_{key_suffix}", config=PCFG)
+        with cr:
+            fig = go.Figure()
+            for tkr, name in asset_dict.items():
+                if tkr in al.columns:
+                    fig.add_trace(go.Scatter(
+                        x=al.index, y=al[tkr], name=name, mode="lines"))
+            fig.add_hline(y=0.0, line_dash="dash", line_color="gray")
+            fig.update_layout(
+                title=chart_title(f"{group_label} Rolling 6M Alpha",
+                                  "Compounded 126-day relative return"),
+                template="plotly_white", height=380,
+                margin=dict(b=90, t=50, l=55, r=30), legend=LEG,
+                dragmode=False, annotations=[src_ann(-0.22)])
+            st.plotly_chart(fig, use_container_width=True,
+                            key=f"alpha_{key_suffix}", config=PCFG)
 
-    st.divider()
+    st.markdown("#### Factors")
+    _build_pair(FACTORS, "Factor", base, "factors")
 
-    ps = st.radio("Period", list(period_opts.keys()), horizontal=True, key="ps")
-    base_s = (period_opts[ps] or
-              (prices.index.max() - pd.DateOffset(months=12)).strftime("%Y-%m-%d"))
-    rel_s, alpha_s = compute_relative(prices, SECTORS)
-    ri_s = reindex_from(rel_s, base_s)
-    al_s = alpha_s[alpha_s.index >= pd.Timestamp(base_s)]
+    st.markdown("#### Cyclical Sectors")
+    _build_pair(SECTORS_CYCLICAL, "Cyclical", base, "cyclical")
 
-    fig_s1 = go.Figure()
-    for tkr, name in SECTORS.items():
-        if tkr in ri_s.columns:
-            fig_s1.add_trace(go.Scatter(x=ri_s.index, y=ri_s[tkr], name=name, mode="lines"))
-    fig_s1.add_hline(y=1.0, line_dash="dash", line_color="gray")
-    fig_s1.update_layout(
-        title=chart_title("Sector ETF Relative Performance",
-                          "ETF ÷ SPY, indexed to 1.0 · above = outperforming"),
-        template="plotly_white", height=420,
-        margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
-    st.plotly_chart(fig_s1, use_container_width=True, key="fig_s1", config=PCFG)
-
-    fig_s2 = go.Figure()
-    for tkr, name in SECTORS.items():
-        if tkr in al_s.columns:
-            fig_s2.add_trace(go.Scatter(x=al_s.index, y=al_s[tkr], name=name, mode="lines"))
-    fig_s2.add_hline(y=0.0, line_dash="dash", line_color="gray")
-    fig_s2.update_layout(
-        title=chart_title("Sector ETF Rolling 6-Month Alpha",
-                          "Compounded 126-day return of relative series"),
-        template="plotly_white", height=420,
-        margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
-    st.plotly_chart(fig_s2, use_container_width=True, key="fig_s2", config=PCFG)
+    st.markdown("#### Defensive Sectors")
+    _build_pair(SECTORS_DEFENSIVE, "Defensive", base, "defensive")
 
     # ── INDIVIDUAL ETF CHARTS — Flow only ────────────────────────────────────
     st.divider()
