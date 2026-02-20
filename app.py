@@ -434,17 +434,19 @@ def build_holdings_attribution(etf_ticker, prices):
         df = df.sort_values("Contribution", key=abs, ascending=False).reset_index(drop=True)
     return df, etf_ret, is_live
 
-def build_positioning_table(prices, volumes, asset_dict, period_start):
+def build_positioning_table(prices, volumes, asset_dict, ret_days):
     rows = []
     for tkr, name in asset_dict.items():
         try:
             p = prices[tkr].dropna()
             if len(p) < 2:
                 continue
-            ret_1d = p.pct_change().iloc[-1] * 100
-            ret_5d = ((p.iloc[-1] / p.iloc[-5]) - 1) * 100 if len(p) >= 5 else np.nan
-            p_trim = p[p.index >= pd.Timestamp(period_start)]
-            idx_ret = ((p_trim.iloc[-1] / p_trim.iloc[0]) - 1) * 100 if len(p_trim) > 1 else np.nan
+            if ret_days == 1:
+                ret = p.pct_change().iloc[-1] * 100
+            elif len(p) > ret_days:
+                ret = ((p.iloc[-1] / p.iloc[-ret_days]) - 1) * 100
+            else:
+                ret = np.nan
             fz = compute_flow_proxy_z(prices, volumes, tkr)
             flow_z = round(fz.iloc[-1], 2) if len(fz) > 0 else np.nan
             svz = compute_signed_volume_z(prices, volumes, tkr)
@@ -458,16 +460,12 @@ def build_positioning_table(prices, volumes, asset_dict, period_start):
             composite = round(np.mean(components), 2) if components else np.nan
             rows.append({
                 "Ticker": tkr, "Name": name,
-                "1D Ret %": round(ret_1d, 2),
-                "5D Ret %": round(ret_5d, 2) if not np.isnan(ret_5d) else np.nan,
-                "Period Ret %": round(idx_ret, 2),
+                "Return %": round(ret, 2) if not np.isnan(ret) else np.nan,
                 "Flow Z": flow_z, "Signed Vol Z": svol_z, "Composite": composite
             })
         except Exception:
             continue
     df = pd.DataFrame(rows)
-    if not df.empty:
-        df = df.sort_values("5D Ret %", ascending=False).reset_index(drop=True)
     return df
 
 def style_positioning_table(df):
@@ -485,11 +483,11 @@ def style_positioning_table(df):
     for c in ["Flow Z", "Signed Vol Z", "Composite"]:
         if c in df.columns:
             styler = styler.map(_color_z, subset=[c])
-    for c in ["1D Ret %", "5D Ret %", "Period Ret %"]:
+    for c in ["Return %"]:
         if c in df.columns:
             styler = styler.map(_color_ret, subset=[c])
     fmt = {}
-    for c in ["1D Ret %", "5D Ret %", "Period Ret %", "Flow Z", "Signed Vol Z", "Composite"]:
+    for c in ["Return %", "Flow Z", "Signed Vol Z", "Composite"]:
         if c in df.columns:
             fmt[c] = "{:+.2f}"
     styler = styler.format(fmt, na_rep="—")
@@ -688,7 +686,7 @@ with tab2:
         "All 252-day rolling, clipped ±3.")
 
     # ── Regime charts ──
-    rc1, rc2, rc3 = st.columns(3)
+    rc1, rc2, rc3, rc4 = st.columns(4)
 
     with rc1:
         try:
@@ -710,12 +708,12 @@ with tab2:
                     title=dict(text=(
                         f"<b>Rotation Ratio</b> — {rr_val:.2f} ({rr_label})<br>"
                         f"<span style='font-size:11px;color:#666'>"
-                        f">0.75 sector-driven · <0.25 stock-dispersion</span>"),
-                        font=dict(size=13)),
-                    template="plotly_white", height=300,
-                    yaxis_title="Percentile", yaxis=dict(range=[0, 1]),
-                    margin=dict(b=50, t=70, l=50, r=30),
-                    dragmode=False, annotations=[src_ann(-0.15)])
+                        f">0.75 sector · <0.25 stock-disp</span>"),
+                        font=dict(size=12)),
+                    template="plotly_white", height=280,
+                    yaxis_title="Pctile", yaxis=dict(range=[0, 1]),
+                    margin=dict(b=45, t=65, l=45, r=25),
+                    dragmode=False)
                 st.plotly_chart(fig_rr, use_container_width=True,
                                 key="fig_rotation", config=PCFG)
             else:
@@ -740,13 +738,13 @@ with tab2:
                 fig_br.add_hline(y=1.0, line_dash="dash", line_color="gray")
                 fig_br.update_layout(
                     title=dict(text=(
-                        f"<b>Breadth (RSP/SPY)</b> — {br_now:.4f} ({br_label})<br>"
+                        f"<b>Breadth</b> — {br_now:.4f} ({br_label})<br>"
                         f"<span style='font-size:11px;color:#666'>"
-                        f"Rising = broadening · falling = concentrated</span>"),
-                        font=dict(size=13)),
-                    template="plotly_white", height=300, yaxis_title="Indexed",
-                    margin=dict(b=50, t=70, l=50, r=30),
-                    dragmode=False, annotations=[src_ann(-0.15)])
+                        f"RSP/SPY · rising = broadening</span>"),
+                        font=dict(size=12)),
+                    template="plotly_white", height=280, yaxis_title="Indexed",
+                    margin=dict(b=45, t=65, l=45, r=25),
+                    dragmode=False)
                 st.plotly_chart(fig_br, use_container_width=True,
                                 key="fig_breadth", config=PCFG)
         except Exception:
@@ -757,8 +755,8 @@ with tab2:
             ri = compute_retail_intensity(volumes)
             if len(ri) > 0:
                 ri_val = ri.iloc[-1]
-                ri_label = ("Elevated retail" if ri_val > 1.0
-                            else "Low retail" if ri_val < -1.0
+                ri_label = ("Elevated" if ri_val > 1.0
+                            else "Low" if ri_val < -1.0
                             else "Normal")
                 ri_t = ri[ri.index >= ri.index.max() - pd.DateOffset(months=12)]
                 fig_ri = go.Figure()
@@ -772,41 +770,88 @@ with tab2:
                     title=dict(text=(
                         f"<b>Retail Intensity</b> — {ri_val:+.2f}σ ({ri_label})<br>"
                         f"<span style='font-size:11px;color:#666'>"
-                        f"(TQQQ+SQQQ)/QQQ vol z-score</span>"),
-                        font=dict(size=13)),
-                    template="plotly_white", height=300, yaxis_title="Z-Score",
-                    margin=dict(b=50, t=70, l=50, r=30),
-                    dragmode=False, annotations=[src_ann(-0.15)])
+                        f"(TQQQ+SQQQ)/QQQ vol z</span>"),
+                        font=dict(size=12)),
+                    template="plotly_white", height=280, yaxis_title="Z-Score",
+                    margin=dict(b=45, t=65, l=45, r=25),
+                    dragmode=False)
                 st.plotly_chart(fig_ri, use_container_width=True,
                                 key="fig_retail", config=PCFG)
         except Exception:
             st.info("Retail intensity data unavailable.")
 
-    # ── Positioning table ──
-    pos_freq = st.radio(
-        "Return period", ["1D", "1W", "1M", "YTD"],
-        horizontal=True, key="pos_freq")
-    pos_latest = prices.index.max()
-    if pos_freq == "1D":
-        pos_start = (pos_latest - pd.tseries.offsets.BDay(1)).strftime("%Y-%m-%d")
-    elif pos_freq == "1W":
-        pos_start = (pos_latest - pd.tseries.offsets.BDay(5)).strftime("%Y-%m-%d")
-    elif pos_freq == "1M":
-        pos_start = (pos_latest - pd.DateOffset(months=1)).strftime("%Y-%m-%d")
-    else:
-        pos_start = f"{pos_latest.year}-01-01"
+    with rc4:
+        try:
+            spy_vol = volumes["SPY"].dropna()
+            spy_z = compute_volume_zscore(spy_vol)
+            spy_z_t = spy_z[spy_z.index >= spy_z.index.max() - pd.DateOffset(months=12)]
+            spy_z_now = spy_z_t.iloc[-1]
+            bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in spy_z_t.values]
+            fig_sv = go.Figure()
+            fig_sv.add_trace(go.Bar(
+                x=spy_z_t.index, y=spy_z_t.values,
+                marker_color=bar_colors, opacity=0.6, showlegend=False))
+            fig_sv.add_hline(y=0, line_dash="dash", line_color="gray")
+            fig_sv.update_layout(
+                title=dict(text=(
+                    f"<b>SPY Volume</b> — {spy_z_now:+.2f}σ<br>"
+                    f"<span style='font-size:11px;color:#666'>"
+                    f"252d z-score · green = above avg</span>"),
+                    font=dict(size=12)),
+                template="plotly_white", height=280, yaxis_title="Z-Score",
+                yaxis=dict(range=[-3.5, 3.5]),
+                margin=dict(b=45, t=65, l=45, r=25),
+                dragmode=False)
+            st.plotly_chart(fig_sv, use_container_width=True,
+                            key="fig_spy_vol", config=PCFG)
+        except Exception:
+            st.info("SPY volume unavailable.")
 
-    df_sec = build_positioning_table(prices, volumes, SECTORS, pos_start)
-    df_fac = build_positioning_table(prices, volumes, FACTORS, pos_start)
+    # ── Positioning table: top 3 + bottom 3 ──
+    pos_freq = st.radio(
+        "Return period", ["1D", "5D", "1M", "12M"],
+        horizontal=True, key="pos_freq")
+    ret_days = {"1D": 1, "5D": 5, "1M": 21, "12M": 252}[pos_freq]
+
+    df_sec = build_positioning_table(prices, volumes, SECTORS, ret_days)
+    df_fac = build_positioning_table(prices, volumes, FACTORS, ret_days)
     df_all = pd.concat([df_sec, df_fac], ignore_index=True)
 
-    if not df_all.empty:
-        df_all = df_all.sort_values("5D Ret %", ascending=False).reset_index(drop=True)
-        st.markdown("**All Sectors & Factors** — sorted by 5D return")
-        st.dataframe(
-            style_positioning_table(df_all),
-            hide_index=True, use_container_width=True,
-            height=min(35 * len(df_all) + 38, 580))
+    if not df_all.empty and "Composite" in df_all.columns:
+        df_ranked = df_all.dropna(subset=["Composite"]).sort_values(
+            "Composite", ascending=False).reset_index(drop=True)
+        top3 = df_ranked.head(3)
+        bot3 = df_ranked.tail(3)
+        df_display = pd.concat([top3, bot3], ignore_index=True)
+        df_display = df_display.rename(columns={"Return %": f"{pos_freq} Ret %"})
+        st.markdown(f"**Top 3 / Bottom 3 by Composite** — {pos_freq} return")
+        # Re-apply styling with renamed column
+        def _style_topbot(df_d):
+            def _cz(val):
+                if pd.isna(val): return ""
+                if val >= 2:  return "color:#2ca02c;font-weight:bold"
+                if val <= -2: return "color:#d62728;font-weight:bold"
+                if val >= 1:  return "color:#2ca02c"
+                if val <= -1: return "color:#d62728"
+                return ""
+            def _cr(val):
+                if pd.isna(val): return ""
+                return "color:#2ca02c" if val > 0 else "color:#d62728" if val < 0 else ""
+            s = df_d.style
+            for c in ["Flow Z", "Signed Vol Z", "Composite"]:
+                if c in df_d.columns:
+                    s = s.map(_cz, subset=[c])
+            ret_col = f"{pos_freq} Ret %"
+            if ret_col in df_d.columns:
+                s = s.map(_cr, subset=[ret_col])
+            fmt = {}
+            for c in [ret_col, "Flow Z", "Signed Vol Z", "Composite"]:
+                if c in df_d.columns:
+                    fmt[c] = "{:+.2f}"
+            s = s.format(fmt, na_rep="—")
+            return s
+        st.dataframe(_style_topbot(df_display),
+                     hide_index=True, use_container_width=True, height=248)
 
     # ── RELATIVE PERFORMANCE ─────────────────────────────────────────────────
     st.divider()
@@ -876,11 +921,10 @@ with tab2:
         margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
     st.plotly_chart(fig_s2, use_container_width=True, key="fig_s2", config=PCFG)
 
-    # ── INDIVIDUAL ETF CHARTS — Flow + Volume side by side ───────────────────
+    # ── INDIVIDUAL ETF CHARTS — Flow only ────────────────────────────────────
     st.divider()
-    st.subheader("Individual ETF — Flow & Volume")
-    st.caption("Left: price return + flow z-score · Right: price indexed + volume z-score · "
-               "All z-scores 252-day rolling, clipped ±3")
+    st.subheader("Individual ETF — Flow & Price")
+    st.caption("Price return % + flow z-score (252d rolling, clipped ±3)")
 
     chart_window_opt = st.radio(
         "Chart window", ["3M", "6M", "1Y"],
@@ -915,7 +959,7 @@ with tab2:
                       secondary_y=False)
         fig.update_layout(
             title=dict(text=(
-                f"<b>{label}</b> ({ticker}) — Flow<br>"
+                f"<b>{label}</b> ({ticker})<br>"
                 f"<span style='font-size:11px;color:#666'>"
                 f"Return % · Flow z-score (252d)</span>"),
                 font=dict(size=13)),
@@ -929,75 +973,23 @@ with tab2:
                          range=[-3.5, 3.5], dtick=1, showgrid=False)
         return fig
 
-    def build_vol_chart(ticker, label, prices, volumes, window):
-        if ticker not in prices.columns or ticker not in volumes.columns:
-            return None
-        p = prices[ticker].dropna()
-        cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
-        p = p[p.index >= cutoff]
-        if len(p) < 10:
-            return None
-        p_idx = p / p.iloc[0]
-        z_full = compute_volume_zscore(volumes[ticker].dropna())
-        z = z_full[z_full.index >= cutoff]
-        common = p_idx.index.intersection(z.index)
-        p_idx, z = p_idx.loc[common], z.loc[common]
-        if len(common) < 5:
-            return None
-        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in z.values]
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_trace(
-            go.Bar(x=z.index, y=z.values, name="Vol Z",
-                   marker_color=bar_colors, opacity=0.35), secondary_y=True)
-        fig.add_trace(
-            go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
-                       mode="lines", line=dict(color="#1f77b4", width=2.5)),
-            secondary_y=False)
-        fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=1,
-                      secondary_y=False)
-        fig.update_layout(
-            title=dict(text=(
-                f"<b>{label}</b> ({ticker}) — Volume<br>"
-                f"<span style='font-size:11px;color:#666'>"
-                f"Indexed price · Vol z-score (252d)</span>"),
-                font=dict(size=13)),
-            template="plotly_white", height=320,
-            margin=dict(b=55, t=65, l=50, r=40),
-            legend=dict(orientation="h", yanchor="top", y=-0.18,
-                        x=0.5, xanchor="center", font=dict(size=9)),
-            dragmode=False, bargap=0.1, annotations=[src_ann(-0.22)])
-        fig.update_yaxes(title_text="Indexed", secondary_y=False)
-        fig.update_yaxes(title_text="Vol Z", secondary_y=True,
-                         range=[-3.5, 3.5], dtick=1, showgrid=False)
-        return fig
-
     st.markdown("#### Sector ETFs")
-    for tkr, name in SECTORS.items():
-        c_l, c_r = st.columns(2)
-        flow_fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
-        vol_fig = build_vol_chart(tkr, name, prices, volumes, chart_bdays)
-        if flow_fig:
-            with c_l:
-                st.plotly_chart(flow_fig, use_container_width=True,
+    sec_flow_cols = st.columns(3)
+    for i, (tkr, name) in enumerate(SECTORS.items()):
+        fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
+        if fig:
+            with sec_flow_cols[i % 3]:
+                st.plotly_chart(fig, use_container_width=True,
                                 key=f"flow_{tkr}", config=PCFG)
-        if vol_fig:
-            with c_r:
-                st.plotly_chart(vol_fig, use_container_width=True,
-                                key=f"vol_{tkr}", config=PCFG)
 
     st.markdown("#### Factor ETFs")
-    for tkr, name in FACTORS.items():
-        c_l, c_r = st.columns(2)
-        flow_fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
-        vol_fig = build_vol_chart(tkr, name, prices, volumes, chart_bdays)
-        if flow_fig:
-            with c_l:
-                st.plotly_chart(flow_fig, use_container_width=True,
+    fac_flow_cols = st.columns(3)
+    for i, (tkr, name) in enumerate(FACTORS.items()):
+        fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
+        if fig:
+            with fac_flow_cols[i % 3]:
+                st.plotly_chart(fig, use_container_width=True,
                                 key=f"flow_{tkr}", config=PCFG)
-        if vol_fig:
-            with c_r:
-                st.plotly_chart(vol_fig, use_container_width=True,
-                                key=f"vol_{tkr}", config=PCFG)
 
     # ── ETF HOLDINGS DRILL-DOWN ──────────────────────────────────────────────
     st.divider()
