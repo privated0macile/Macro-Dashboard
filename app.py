@@ -708,7 +708,7 @@ with tab1:
                         f">0.75 sector-driven · <0.25 stock-driven</span>"),
                         font=dict(size=12)),
                     template="plotly_white", height=280,
-                    yaxis_title="%-tile", yaxis=dict(range=[0, 1]), yaxis=dict(range=[0, 1]),
+                    yaxis_title="%-tile", yaxis=dict(range=[0, 1]),
                     margin=dict(b=45, t=65, l=45, r=25),
                     dragmode=False)
                 st.plotly_chart(fig_rr, use_container_width=True,
