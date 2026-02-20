@@ -198,25 +198,21 @@ def fetch_equity():
                + RETAIL_ETFS + holding_tickers
                + [BENCH, "RSP"])
     tickers = list(set(tickers))
-    # Download in batches to avoid timeouts on Streamlit Cloud
-    all_close, all_vol = [], []
-    batch_size = 30
-    for i in range(0, len(tickers), batch_size):
-        batch = tickers[i:i + batch_size]
-        try:
-            raw = yf.download(batch, start=START, auto_adjust=True,
-                              progress=False, threads=True)
-            if len(batch) == 1:
-                # Single ticker returns Series not DataFrame
-                all_close.append(raw["Close"].to_frame(batch[0]))
-                all_vol.append(raw["Volume"].to_frame(batch[0]))
-            else:
-                all_close.append(raw["Close"])
-                all_vol.append(raw["Volume"])
-        except Exception:
-            continue
-    close = pd.concat(all_close, axis=1) if all_close else pd.DataFrame()
-    volume = pd.concat(all_vol, axis=1) if all_vol else pd.DataFrame()
+    try:
+        raw = yf.download(tickers, start=START, auto_adjust=True,
+                          progress=False, threads=True)
+        close = raw["Close"]
+        volume = raw["Volume"]
+    except Exception:
+        # Fallback: try without holdings (much smaller set)
+        core = (list(FACTORS.keys()) + list(SECTORS.keys())
+                + list(INDICES.keys()) + list(EW_SECTORS.values())
+                + RETAIL_ETFS + [BENCH, "RSP"])
+        core = list(set(core))
+        raw = yf.download(core, start=START, auto_adjust=True,
+                          progress=False, threads=True)
+        close = raw["Close"]
+        volume = raw["Volume"]
     return close, volume
 
 @st.cache_data(ttl=3600)
@@ -778,7 +774,7 @@ with tab2:
     except Exception:
         regime_cols[3].metric("Sector Dispersion", "N/A")
 
-    # ── Build positioning data for charts ──
+    # ── Build positioning data ──
     pos_freq = st.radio(
         "Return period", ["1D", "1W", "1M", "YTD"],
         horizontal=True, key="pos_freq")
@@ -800,7 +796,7 @@ with tab2:
     if not df_all.empty and "Composite" in df_all.columns:
         df_ranked = df_all.dropna(subset=["Composite"]).sort_values("Composite", ascending=False)
         top3 = df_ranked.head(3)
-        bot3 = df_ranked.tail(3).iloc[::-1]  # worst first
+        bot3 = df_ranked.tail(3).iloc[::-1]
 
         sum_l, sum_r = st.columns(2)
         with sum_l:
@@ -820,95 +816,70 @@ with tab2:
                               "Flow Z", "Signed Vol Z", "Composite"]].reset_index(drop=True)),
                     hide_index=True, use_container_width=True, height=145)
 
-    # ── Positioning bar charts ──
-    def build_z_bar_chart(df, title_label):
-        """Horizontal grouped bar chart: Flow Z and Signed Vol Z."""
-        if df.empty:
-            return None
-        df_s = df.sort_values("Composite", ascending=True)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=df_s["Ticker"] + " " + df_s["Name"],
-            x=df_s["Flow Z"], name="Flow Z",
-            orientation="h", marker_color=[
-                "#2ca02c" if v >= 0 else "#d62728" for v in df_s["Flow Z"]],
-            opacity=0.85))
-        fig.add_trace(go.Bar(
-            y=df_s["Ticker"] + " " + df_s["Name"],
-            x=df_s["Signed Vol Z"], name="Signed Vol Z",
-            orientation="h", marker_color=[
-                "#17becf" if v >= 0 else "#e377c2" for v in df_s["Signed Vol Z"]],
-            opacity=0.65))
-        fig.add_vline(x=0, line_color="gray", line_width=1)
-        fig.add_vline(x=2, line_dash="dot", line_color="#2ca02c", line_width=0.8)
-        fig.add_vline(x=-2, line_dash="dot", line_color="#d62728", line_width=0.8)
-        fig.update_layout(
-            title=dict(text=(
-                f"<b>{title_label} Z-Scores</b><br>"
-                f"<span style='font-size:11px;color:#666'>"
-                f"Flow Z (green/red) + Signed Vol Z (cyan/pink) · "
-                f"dotted lines at ±2</span>"),
-                font=dict(size=13)),
-            template="plotly_white",
-            height=max(len(df_s) * 45 + 100, 300),
-            barmode="group", bargap=0.25, bargroupgap=0.1,
-            xaxis_title="Z-Score", xaxis=dict(range=[-3.5, 3.5]),
-            margin=dict(b=60, t=70, l=150, r=30),
-            legend=dict(orientation="h", yanchor="top", y=-0.12,
-                        x=0.5, xanchor="center"),
-            dragmode=False, annotations=[src_ann(-0.15)])
-        return fig
-
-    def build_return_bar_chart(df, title_label, freq_label):
-        """Horizontal bar chart: period return."""
-        if df.empty:
-            return None
-        df_s = df.sort_values("Period Ret %", ascending=True)
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            y=df_s["Ticker"] + " " + df_s["Name"],
-            x=df_s["Period Ret %"], name=f"{freq_label} Return",
-            orientation="h",
-            marker_color=["#2ca02c" if v >= 0 else "#d62728"
-                          for v in df_s["Period Ret %"]],
-            showlegend=False))
-        fig.add_vline(x=0, line_color="gray", line_width=1)
-        fig.update_layout(
-            title=dict(text=(
-                f"<b>{title_label} Returns ({freq_label})</b><br>"
-                f"<span style='font-size:11px;color:#666'>"
-                f"Cumulative return over period</span>"),
-                font=dict(size=13)),
-            template="plotly_white",
-            height=max(len(df_s) * 40 + 100, 280),
-            xaxis_title="Return (%)",
-            margin=dict(b=60, t=70, l=150, r=30),
-            dragmode=False, annotations=[src_ann(-0.15)])
-        return fig
-
+    # ── Positioning time-series charts ──
     st.divider()
 
-    # Sectors
-    sec_z_col, sec_ret_col = st.columns(2)
-    with sec_z_col:
-        fig = build_z_bar_chart(df_sec, "Sector")
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, key="bar_sec_z", config=PCFG)
-    with sec_ret_col:
-        fig = build_return_bar_chart(df_sec, "Sector", pos_freq)
-        if fig:
-            st.plotly_chart(fig, use_container_width=True, key="bar_sec_ret", config=PCFG)
+    def build_flow_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
+        """Dual-axis: indexed price (line) + flow z-score (bars) over 3 months."""
+        if ticker not in prices.columns:
+            return None
+        p = prices[ticker].dropna()
+        cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
+        p = p[p.index >= cutoff]
+        if len(p) < 10:
+            return None
+        p_idx = (p / p.iloc[0] - 1) * 100  # % return from start
+        fz = compute_flow_proxy_z(prices, volumes, ticker)
+        fz = fz[fz.index >= cutoff]
+        common = p_idx.index.intersection(fz.index)
+        p_idx, fz = p_idx.loc[common], fz.loc[common]
+        if len(common) < 5:
+            return None
+        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(
+            go.Bar(x=fz.index, y=fz.values, name="Flow Z",
+                   marker_color=bar_colors, opacity=0.4, showlegend=True),
+            secondary_y=True)
+        fig.add_trace(
+            go.Scatter(x=p_idx.index, y=p_idx.values, name=f"{label}",
+                       mode="lines", line=dict(color="#1f77b4", width=2.5)),
+            secondary_y=False)
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1,
+                      secondary_y=False)
+        fig.update_layout(
+            title=dict(text=(
+                f"<b>{label}</b> ({ticker})<br>"
+                f"<span style='font-size:12px;color:#666'>"
+                f"Return % from start · Flow z-score (63d) ±3</span>"),
+                font=dict(size=14)),
+            template="plotly_white", height=340,
+            margin=dict(b=60, t=70, l=55, r=45),
+            legend=dict(orientation="h", yanchor="top", y=-0.18,
+                        x=0.5, xanchor="center", font=dict(size=10)),
+            dragmode=False, bargap=0.1, annotations=[src_ann(-0.25)])
+        fig.update_yaxes(title_text="Return %", secondary_y=False)
+        fig.update_yaxes(title_text="Flow Z", secondary_y=True,
+                         range=[-3.5, 3.5], dtick=1, showgrid=False)
+        return fig
 
-    # Factors
-    fac_z_col, fac_ret_col = st.columns(2)
-    with fac_z_col:
-        fig = build_z_bar_chart(df_fac, "Factor")
+    st.markdown("#### Sector ETFs — Flow & Price")
+    sec_flow_cols = st.columns(3)
+    for i, (tkr, name) in enumerate(SECTORS.items()):
+        fig = build_flow_chart(tkr, name, prices, volumes)
         if fig:
-            st.plotly_chart(fig, use_container_width=True, key="bar_fac_z", config=PCFG)
-    with fac_ret_col:
-        fig = build_return_bar_chart(df_fac, "Factor", pos_freq)
+            with sec_flow_cols[i % 3]:
+                st.plotly_chart(fig, use_container_width=True,
+                                key=f"flow_{tkr}", config=PCFG)
+
+    st.markdown("#### Factor ETFs — Flow & Price")
+    fac_flow_cols = st.columns(3)
+    for i, (tkr, name) in enumerate(FACTORS.items()):
+        fig = build_flow_chart(tkr, name, prices, volumes)
         if fig:
-            st.plotly_chart(fig, use_container_width=True, key="bar_fac_ret", config=PCFG)
+            with fac_flow_cols[i % 3]:
+                st.plotly_chart(fig, use_container_width=True,
+                                key=f"flow_{tkr}", config=PCFG)
 
     # ── REGIME CHARTS ────────────────────────────────────────────────────────
     st.divider()
