@@ -877,53 +877,45 @@ with tab1:
     chart_bdays = {"3M": 63, "6M": 126, "1Y": 252}[chart_window_opt]
 
     def build_flow_chart(ticker, label, prices, volumes, window):
-        if ticker not in prices.columns or ticker not in volumes.columns:
+        if ticker not in prices.columns:
             return None
         p = prices[ticker].dropna()
-        v = volumes[ticker].dropna()
         cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
         p = p[p.index >= cutoff]
-        v = v[v.index >= cutoff]
         if len(p) < 10:
             return None
-        common = p.index.intersection(v.index)
-        p, v = p.loc[common], v.loc[common]
-        # Price return %
-        p_ret = (p / p.iloc[0] - 1) * 100
-        # Raw daily flow proxy: Δ(dollar_volume) - (return × lagged_dollar_volume)
-        dv = p * v
-        ret = p.pct_change()
-        daily_flow = dv.diff() - (ret * dv.shift(1))
-        # Cumulative flow, normalized to millions for readability
-        cum_flow = daily_flow.cumsum() / 1e6
-        cum_flow = cum_flow - cum_flow.iloc[0]  # start at 0
-
+        p_idx = p / p.iloc[0]
+        fz = compute_flow_proxy_z(prices, volumes, ticker)
+        fz = fz[fz.index >= cutoff]
+        common = p_idx.index.intersection(fz.index)
+        p_idx, fz = p_idx.loc[common], fz.loc[common]
+        if len(common) < 5:
+            return None
+        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(
-            go.Scatter(x=p_ret.index, y=p_ret.values, name="Return %",
-                       mode="lines", line=dict(color="#999999", width=1.8)),
-            secondary_y=False)
+            go.Bar(x=fz.index, y=fz.values, name="Flow Z",
+                   marker_color=bar_colors, opacity=0.35), secondary_y=True)
         fig.add_trace(
-            go.Scatter(x=cum_flow.index, y=cum_flow.values, name="Cum. Flow",
+            go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
                        mode="lines", line=dict(color="#1f77b4", width=2.5)),
-            secondary_y=True)
-        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=0.8,
+            secondary_y=False)
+        fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=0.8,
                       secondary_y=False)
-        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=0.8,
-                      secondary_y=True)
         fig.update_layout(
             title=dict(text=(
                 f"<b>{label}</b> ({ticker})<br>"
                 f"<span style='font-size:11px;color:#666'>"
-                f"Grey = return % · Blue = cumulative flow ($M)</span>"),
+                f"Price indexed · Flow z (252d) · green = accumulation</span>"),
                 font=dict(size=13)),
             template="plotly_white", height=320,
-            margin=dict(b=55, t=65, l=50, r=50),
+            margin=dict(b=55, t=65, l=50, r=40),
             legend=dict(orientation="h", yanchor="top", y=-0.18,
                         x=0.5, xanchor="center", font=dict(size=9)),
-            dragmode=False, annotations=[src_ann(-0.22)])
-        fig.update_yaxes(title_text="Ret %", secondary_y=False)
-        fig.update_yaxes(title_text="Flow ($M)", secondary_y=True, showgrid=False)
+            dragmode=False, bargap=0.1, annotations=[src_ann(-0.22)])
+        fig.update_yaxes(title_text="Indexed", secondary_y=False)
+        fig.update_yaxes(title_text="Flow Z", secondary_y=True,
+                         range=[-3.5, 3.5], dtick=1, showgrid=False)
         return fig
 
     st.markdown("#### Sector ETFs")
