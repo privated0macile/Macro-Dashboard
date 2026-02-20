@@ -782,35 +782,34 @@ with tab2:
 
     with rc4:
         try:
-            spy_vol_period = st.radio(
-                "SPY Vol", ["1M", "6M", "1Y", "3Y"],
-                horizontal=True, key="spy_vol_period", label_visibility="collapsed")
-            spy_vol_months = {"1M": 1, "6M": 6, "1Y": 12, "3Y": 36}[spy_vol_period]
             spy_vol = volumes["SPY"].dropna()
-            cutoff = spy_vol.index.max() - pd.DateOffset(months=spy_vol_months)
-            sv = spy_vol[spy_vol.index >= cutoff]
-            sv_avg = sv.mean()
-            sv_now = sv.iloc[-1]
-            bar_colors = ["#2ca02c" if v >= sv_avg else "#d62728" for v in sv.values]
+            # Z-score against trailing 1Y median & std
+            sv_1y = spy_vol[spy_vol.index >= spy_vol.index.max() - pd.DateOffset(months=12)]
+            sv_med = sv_1y.median()
+            sv_std = sv_1y.std()
+            sv_z_full = ((spy_vol - sv_med) / sv_std).clip(-3, 3)
+            # Display 3M
+            cutoff_3m = spy_vol.index.max() - pd.DateOffset(months=3)
+            sv_z = sv_z_full[sv_z_full.index >= cutoff_3m]
+            sv_z_now = sv_z.iloc[-1]
+            bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in sv_z.values]
             fig_sv = go.Figure()
             fig_sv.add_trace(go.Bar(
-                x=sv.index, y=sv.values / 1e6,
+                x=sv_z.index, y=sv_z.values,
                 marker_color=bar_colors, opacity=0.7, showlegend=False))
-            fig_sv.add_hline(y=sv_avg / 1e6, line_dash="dash",
-                             line_color="#1f77b4", line_width=2,
-                             annotation_text=f"Avg {sv_avg/1e6:.0f}M",
-                             annotation_position="top left",
-                             annotation_font_size=10,
-                             annotation_font_color="#1f77b4")
+            fig_sv.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
+            fig_sv.add_hline(y=2, line_dash="dot", line_color="#2ca02c", line_width=0.8)
+            fig_sv.add_hline(y=-2, line_dash="dot", line_color="#d62728", line_width=0.8)
             fig_sv.update_layout(
                 title=dict(text=(
-                    f"<b>SPY Volume</b> — {sv_now/1e6:.0f}M today<br>"
+                    f"<b>SPY Volume</b> — {sv_z_now:+.2f}σ today<br>"
                     f"<span style='font-size:11px;color:#666'>"
-                    f"Green = above avg · red = below</span>"),
+                    f"0 = 1Y median · 3M window · ±3</span>"),
                     font=dict(size=12)),
-                template="plotly_white", height=280, yaxis_title="Vol (M)",
+                template="plotly_white", height=280, yaxis_title="Z-Score",
+                yaxis=dict(range=[-3.5, 3.5], dtick=1),
                 margin=dict(b=45, t=65, l=45, r=25),
-                bargap=0.1, dragmode=False)
+                bargap=0.15, dragmode=False)
             st.plotly_chart(fig_sv, use_container_width=True,
                             key="fig_spy_vol", config=PCFG)
         except Exception:
