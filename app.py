@@ -860,11 +860,11 @@ with tab1:
     st.markdown("#### Factors")
     _build_pair(FACTORS, "Factor", base, "factors")
 
-    st.markdown("#### Cyclical Sectors")
-    _build_pair(SECTORS_CYCLICAL, "Cyclical", base, "cyclical")
+    st.markdown("#### Cyclical-Tilt Sectors")
+    _build_pair(SECTORS_CYCLICAL, "Cyclical-Tilt", base, "cyclical")
 
-    st.markdown("#### Defensive Sectors")
-    _build_pair(SECTORS_DEFENSIVE, "Defensive", base, "defensive")
+    st.markdown("#### Defensive-Tilt Sectors")
+    _build_pair(SECTORS_DEFENSIVE, "Defensive-Tilt", base, "defensive")
 
     # ── INDIVIDUAL ETF CHARTS — Flow only ────────────────────────────────────
     st.divider()
