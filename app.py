@@ -30,6 +30,9 @@ CM = dict(b=120, t=60, l=60, r=40)
 LEG = dict(orientation="h", yanchor="top", y=-0.25, x=0.5, xanchor="center")
 PCFG = dict(displayModeBar=False, scrollZoom=False)
 
+ZSCORE_LOOKBACK = 252
+CHART_WINDOW = 63
+
 FACTORS = {
     "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size",
     "VLUE": "Value", "USMV": "Min Vol"
@@ -51,7 +54,6 @@ EW_SECTORS = {
 }
 RETAIL_ETFS = ["TQQQ", "SQQQ"]
 
-# Hardcoded holdings (always available as fallback)
 HOLDINGS = {
     "XLK": [
         ("AAPL", "Apple", 0.22), ("MSFT", "Microsoft", 0.21),
@@ -117,7 +119,6 @@ HOLDINGS = {
 
 @st.cache_data(ttl=86400)
 def fetch_live_holdings(etf_ticker, top_n=10):
-    """Try to pull live holdings from yfinance. Returns list or None."""
     try:
         t = yf.Ticker(etf_ticker)
         if not hasattr(t, 'funds_data') or t.funds_data is None:
@@ -137,7 +138,6 @@ def fetch_live_holdings(etf_ticker, top_n=10):
         return None
 
 def get_holdings(etf_ticker):
-    """Return holdings for an ETF: try live, fall back to hardcoded."""
     live = fetch_live_holdings(etf_ticker)
     if live:
         return live, True
@@ -176,9 +176,6 @@ FOMC = {
     ]
 }
 
-ZSCORE_LOOKBACK = 252  # 1 year of trading days
-CHART_WINDOW = 63     # 3-month display window for charts
-
 # ─── DATA FETCHERS ───────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600)
@@ -204,7 +201,6 @@ def fetch_equity():
         close = raw["Close"]
         volume = raw["Volume"]
     except Exception:
-        # Fallback: try without holdings (much smaller set)
         core = (list(FACTORS.keys()) + list(SECTORS.keys())
                 + list(INDICES.keys()) + list(EW_SECTORS.values())
                 + RETAIL_ETFS + [BENCH, "RSP"])
@@ -312,11 +308,28 @@ def src_ann(y=-0.30):
     return dict(
         text="Source: FRED / Yahoo Finance",
         xref="paper", yref="paper", x=1.0, y=y,
-        showarrow=False, font=dict(size=10, color="#888888"), xanchor="right"
-    )
+        showarrow=False, font=dict(size=10, color="#888888"), xanchor="right")
 
 def chart_title(main, sub):
     return f"{main} {sub}"
+
+def safe_fmt(val):
+    try:
+        return f"{float(val):.2f}"
+    except (ValueError, TypeError):
+        return str(val)
+
+def snap_color(row):
+    styles = [""] * len(row)
+    try:
+        cols = list(row.index)
+        l, p = float(row["Latest"]), float(row["Previous"])
+        idx = cols.index("Latest")
+        styles[idx] = ("color:#2ca02c;font-weight:bold" if l > p
+                       else "color:#d62728;font-weight:bold" if l < p else "")
+    except (ValueError, TypeError):
+        pass
+    return styles
 
 # ─── VOLUME & POSITIONING HELPERS ────────────────────────────────────────────
 
@@ -395,7 +408,6 @@ def compute_rotation_ratio(prices, smooth=21, norm_window=252):
     return pct_rank.dropna(), smoothed.dropna()
 
 def build_holdings_attribution(etf_ticker, prices):
-    """Compute daily return attribution for an ETF's top holdings."""
     holdings, is_live = get_holdings(etf_ticker)
     if not holdings:
         return pd.DataFrame(), np.nan, False
@@ -496,46 +508,6 @@ def style_attribution_table(df):
     }, na_rep="—")
     return styler
 
-def build_volume_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
-    """Kept for compatibility — dual-axis price + volume z-score."""
-    if ticker not in prices.columns or ticker not in volumes.columns:
-        return None
-    p = prices[ticker].dropna()
-    cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
-    p = p[p.index >= cutoff]
-    if len(p) < 10:
-        return None
-    p_idx = p / p.iloc[0]
-    z_full = compute_volume_zscore(volumes[ticker].dropna())
-    z = z_full[z_full.index >= cutoff]
-    common = p_idx.index.intersection(z.index)
-    p_idx, z = p_idx.loc[common], z.loc[common]
-    if len(common) < 5:
-        return None
-    bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in z.values]
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Bar(x=z.index, y=z.values, name="Vol Z",
-                         marker_color=bar_colors, opacity=0.35), secondary_y=True)
-    fig.add_trace(go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
-                             mode="lines", line=dict(color="#1f77b4", width=2.5)),
-                  secondary_y=False)
-    fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=1,
-                  secondary_y=False)
-    fig.update_layout(
-        title=dict(text=(f"<b>{label}</b> ({ticker})<br>"
-                         f"<span style='font-size:12px;color:#666'>"
-                         f"Indexed price · Vol z-score (252d) ±3</span>"),
-                   font=dict(size=14)),
-        template="plotly_white", height=340,
-        margin=dict(b=60, t=70, l=55, r=45),
-        legend=dict(orientation="h", yanchor="top", y=-0.18,
-                    x=0.5, xanchor="center", font=dict(size=10)),
-        dragmode=False, bargap=0.1, annotations=[src_ann(-0.25)])
-    fig.update_yaxes(title_text="Indexed", secondary_y=False)
-    fig.update_yaxes(title_text="Vol Z", secondary_y=True,
-                     range=[-3.5, 3.5], dtick=1, showgrid=False)
-    return fig
-
 # ─── YIELD / MACRO HELPERS ──────────────────────────────────────────────────
 
 def yield_curve_commentary():
@@ -583,25 +555,6 @@ def build_yield_curve():
         margin=dict(b=70, t=60, l=60, r=40),
         dragmode=False, annotations=[src_ann(-0.18)])
     return fig
-
-def safe_fmt(val):
-    """Format numeric values to 2dp, pass strings through unchanged."""
-    try:
-        return f"{float(val):.2f}"
-    except (ValueError, TypeError):
-        return str(val)
-
-def snap_color(row):
-    styles = [""] * len(row)
-    try:
-        cols = list(row.index)
-        l, p = float(row["Latest"]), float(row["Previous"])
-        idx = cols.index("Latest")
-        styles[idx] = ("color:#2ca02c;font-weight:bold" if l > p
-                       else "color:#d62728;font-weight:bold" if l < p else "")
-    except (ValueError, TypeError):
-        pass
-    return styles
 
 # ─── PAGE HEADER ─────────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -705,7 +658,6 @@ with tab1:
                              use_container_width=True, height=380)
         except Exception:
             st.info("Release data unavailable.")
-        # Next FOMC inline
         all_fomc = FOMC["2025"] + FOMC["2026"]
         today_d = datetime.today().date()
         nxt = next(((l, d) for l, d in all_fomc
@@ -723,8 +675,8 @@ with tab2:
         prices, volumes = fetch_equity()
 
     period_opts = {
-        "Since 2015": "2015-01-01", "Since 2020": "2020-01-01",
-        "Since 2025": "2025-01-01", "Past 12M": None
+        "Past 12M": None, "Since 2015": "2015-01-01",
+        "Since 2020": "2020-01-01", "Since 2025": "2025-01-01"
     }
 
     # ── DAILY POSITIONING FEED ───────────────────────────────────────────────
@@ -735,49 +687,102 @@ with tab2:
         "Composite = (Flow Z + Signed Vol Z + Return Z) / 3 · "
         "All 252-day rolling, clipped ±3.")
 
-    # ── Regime headline metrics ──
-    regime_cols = st.columns(4)
-    try:
-        ri = compute_retail_intensity(volumes)
-        ri_val = ri.iloc[-1] if len(ri) > 0 else np.nan
-        ri_label = ("🟢 Elevated retail" if ri_val > 1.0
-                    else "🔴 Low retail" if ri_val < -1.0
-                    else "⚪ Normal")
-        regime_cols[0].metric("Retail Intensity", f"{ri_val:+.2f}σ", ri_label)
-    except Exception:
-        regime_cols[0].metric("Retail Intensity", "N/A")
+    # ── Regime charts ──
+    rc1, rc2, rc3 = st.columns(3)
 
-    try:
-        br = compute_breadth(prices)
-        br_val = br.iloc[-1] if len(br) > 0 else np.nan
-        br_ref = br.iloc[-252] if len(br) > 252 else br.iloc[0]
-        br_indexed = br_val / br_ref
-        br_label = ("Broad" if br_indexed > 1.005
-                    else "Concentrated" if br_indexed < 0.995 else "Neutral")
-        regime_cols[1].metric("Breadth (RSP/SPY)", f"{br_indexed:.4f}", br_label)
-    except Exception:
-        regime_cols[1].metric("Breadth (RSP/SPY)", "N/A")
+    with rc1:
+        try:
+            rr_pct, rr_raw = compute_rotation_ratio(prices)
+            if len(rr_pct) > 0:
+                rr_val = rr_pct.iloc[-1]
+                rr_label = ("Sector rotation" if rr_val > 0.75
+                            else "Stock dispersion" if rr_val < 0.25
+                            else "Balanced")
+                rr_t = rr_pct[rr_pct.index >= rr_pct.index.max() - pd.DateOffset(months=12)]
+                fig_rr = go.Figure()
+                fig_rr.add_trace(go.Scatter(
+                    x=rr_t.index, y=rr_t.values, mode="lines",
+                    line=dict(color="#1f77b4", width=2), showlegend=False))
+                fig_rr.add_hline(y=0.5, line_dash="dash", line_color="gray")
+                fig_rr.add_hrect(y0=0.25, y1=0.75, fillcolor="gray",
+                                 opacity=0.08, line_width=0)
+                fig_rr.update_layout(
+                    title=dict(text=(
+                        f"<b>Rotation Ratio</b> — {rr_val:.2f} ({rr_label})<br>"
+                        f"<span style='font-size:11px;color:#666'>"
+                        f">0.75 sector-driven · <0.25 stock-dispersion</span>"),
+                        font=dict(size=13)),
+                    template="plotly_white", height=300,
+                    yaxis_title="Percentile", yaxis=dict(range=[0, 1]),
+                    margin=dict(b=50, t=70, l=50, r=30),
+                    dragmode=False, annotations=[src_ann(-0.15)])
+                st.plotly_chart(fig_rr, use_container_width=True,
+                                key="fig_rotation", config=PCFG)
+            else:
+                st.info("Rotation ratio unavailable.")
+        except Exception:
+            rr_pct, rr_raw = pd.Series(dtype=float), pd.Series(dtype=float)
+            st.info("Rotation ratio unavailable.")
 
-    try:
-        rr_pct, rr_raw = compute_rotation_ratio(prices)
-        rr_val = rr_pct.iloc[-1] if len(rr_pct) > 0 else np.nan
-        rr_label = ("Sector rotation" if rr_val > 0.75
-                    else "Stock dispersion" if rr_val < 0.25
-                    else "Balanced")
-        regime_cols[2].metric("Rotation Pctile", f"{rr_val:.2f}", rr_label)
-    except Exception:
-        rr_pct, rr_raw = pd.Series(dtype=float), pd.Series(dtype=float)
-        regime_cols[2].metric("Rotation Pctile", "N/A")
+    with rc2:
+        try:
+            br = compute_breadth(prices)
+            if len(br) > 0:
+                br_t = br[br.index >= br.index.max() - pd.DateOffset(months=12)]
+                br_idx = br_t / br_t.iloc[0]
+                br_now = br_idx.iloc[-1]
+                br_label = ("Broad" if br_now > 1.005
+                            else "Concentrated" if br_now < 0.995 else "Neutral")
+                fig_br = go.Figure()
+                fig_br.add_trace(go.Scatter(
+                    x=br_idx.index, y=br_idx.values, mode="lines",
+                    line=dict(color="#ff7f0e", width=2), showlegend=False))
+                fig_br.add_hline(y=1.0, line_dash="dash", line_color="gray")
+                fig_br.update_layout(
+                    title=dict(text=(
+                        f"<b>Breadth (RSP/SPY)</b> — {br_now:.4f} ({br_label})<br>"
+                        f"<span style='font-size:11px;color:#666'>"
+                        f"Rising = broadening · falling = concentrated</span>"),
+                        font=dict(size=13)),
+                    template="plotly_white", height=300, yaxis_title="Indexed",
+                    margin=dict(b=50, t=70, l=50, r=30),
+                    dragmode=False, annotations=[src_ann(-0.15)])
+                st.plotly_chart(fig_br, use_container_width=True,
+                                key="fig_breadth", config=PCFG)
+        except Exception:
+            st.info("Breadth data unavailable.")
 
-    try:
-        sec_rets_today = prices[list(SECTORS.keys())].pct_change().iloc[-1]
-        disp_today = sec_rets_today.std() * 100
-        regime_cols[3].metric("Sector Dispersion", f"{disp_today:.2f}%",
-                              "Cross-sectional σ today")
-    except Exception:
-        regime_cols[3].metric("Sector Dispersion", "N/A")
+    with rc3:
+        try:
+            ri = compute_retail_intensity(volumes)
+            if len(ri) > 0:
+                ri_val = ri.iloc[-1]
+                ri_label = ("Elevated retail" if ri_val > 1.0
+                            else "Low retail" if ri_val < -1.0
+                            else "Normal")
+                ri_t = ri[ri.index >= ri.index.max() - pd.DateOffset(months=12)]
+                fig_ri = go.Figure()
+                fig_ri.add_trace(go.Scatter(
+                    x=ri_t.index, y=ri_t.values, mode="lines",
+                    line=dict(color="#9467bd", width=2), showlegend=False))
+                fig_ri.add_hline(y=0, line_dash="dash", line_color="gray")
+                fig_ri.add_hrect(y0=-1, y1=1, fillcolor="gray",
+                                 opacity=0.08, line_width=0)
+                fig_ri.update_layout(
+                    title=dict(text=(
+                        f"<b>Retail Intensity</b> — {ri_val:+.2f}σ ({ri_label})<br>"
+                        f"<span style='font-size:11px;color:#666'>"
+                        f"(TQQQ+SQQQ)/QQQ vol z-score</span>"),
+                        font=dict(size=13)),
+                    template="plotly_white", height=300, yaxis_title="Z-Score",
+                    margin=dict(b=50, t=70, l=50, r=30),
+                    dragmode=False, annotations=[src_ann(-0.15)])
+                st.plotly_chart(fig_ri, use_container_width=True,
+                                key="fig_retail", config=PCFG)
+        except Exception:
+            st.info("Retail intensity data unavailable.")
 
-    # ── Build positioning data ──
+    # ── Positioning table ──
     pos_freq = st.radio(
         "Return period", ["1D", "1W", "1M", "YTD"],
         horizontal=True, key="pos_freq")
@@ -795,177 +800,13 @@ with tab2:
     df_fac = build_positioning_table(prices, volumes, FACTORS, pos_start)
     df_all = pd.concat([df_sec, df_fac], ignore_index=True)
 
-    # ── Summary: top/bottom movers ──
-    if not df_all.empty and "Composite" in df_all.columns:
-        df_ranked = df_all.dropna(subset=["Composite"]).sort_values("Composite", ascending=False)
-        top3 = df_ranked.head(3)
-        bot3 = df_ranked.tail(3).iloc[::-1]
-
-        sum_l, sum_r = st.columns(2)
-        with sum_l:
-            st.markdown("**🟢 Strongest Positioning (Top 3)**")
-            if not top3.empty:
-                st.dataframe(
-                    style_positioning_table(
-                        top3[["Ticker", "Name", "1D Ret %", "Period Ret %",
-                              "Flow Z", "Signed Vol Z", "Composite"]].reset_index(drop=True)),
-                    hide_index=True, use_container_width=True, height=145)
-        with sum_r:
-            st.markdown("**🔴 Weakest Positioning (Bottom 3)**")
-            if not bot3.empty:
-                st.dataframe(
-                    style_positioning_table(
-                        bot3[["Ticker", "Name", "1D Ret %", "Period Ret %",
-                              "Flow Z", "Signed Vol Z", "Composite"]].reset_index(drop=True)),
-                    hide_index=True, use_container_width=True, height=145)
-
-    # ── Positioning time-series charts ──
-    st.divider()
-
-    def build_flow_chart(ticker, label, prices, volumes, window=CHART_WINDOW):
-        """Dual-axis: indexed price (line) + flow z-score (bars) over 3 months."""
-        if ticker not in prices.columns:
-            return None
-        p = prices[ticker].dropna()
-        cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
-        p = p[p.index >= cutoff]
-        if len(p) < 10:
-            return None
-        p_idx = (p / p.iloc[0] - 1) * 100  # % return from start
-        fz = compute_flow_proxy_z(prices, volumes, ticker)
-        fz = fz[fz.index >= cutoff]
-        common = p_idx.index.intersection(fz.index)
-        p_idx, fz = p_idx.loc[common], fz.loc[common]
-        if len(common) < 5:
-            return None
-        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
-        fig = make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_trace(
-            go.Bar(x=fz.index, y=fz.values, name="Flow Z",
-                   marker_color=bar_colors, opacity=0.4, showlegend=True),
-            secondary_y=True)
-        fig.add_trace(
-            go.Scatter(x=p_idx.index, y=p_idx.values, name=f"{label}",
-                       mode="lines", line=dict(color="#1f77b4", width=2.5)),
-            secondary_y=False)
-        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1,
-                      secondary_y=False)
-        fig.update_layout(
-            title=dict(text=(
-                f"<b>{label}</b> ({ticker})<br>"
-                f"<span style='font-size:12px;color:#666'>"
-                f"Return % from start · Flow z-score (252d) ±3</span>"),
-                font=dict(size=14)),
-            template="plotly_white", height=340,
-            margin=dict(b=60, t=70, l=55, r=45),
-            legend=dict(orientation="h", yanchor="top", y=-0.18,
-                        x=0.5, xanchor="center", font=dict(size=10)),
-            dragmode=False, bargap=0.1, annotations=[src_ann(-0.25)])
-        fig.update_yaxes(title_text="Return %", secondary_y=False)
-        fig.update_yaxes(title_text="Flow Z", secondary_y=True,
-                         range=[-3.5, 3.5], dtick=1, showgrid=False)
-        return fig
-
-    st.markdown("#### Sector ETFs — Flow & Price")
-    sec_flow_cols = st.columns(3)
-    for i, (tkr, name) in enumerate(SECTORS.items()):
-        fig = build_flow_chart(tkr, name, prices, volumes)
-        if fig:
-            with sec_flow_cols[i % 3]:
-                st.plotly_chart(fig, use_container_width=True,
-                                key=f"flow_{tkr}", config=PCFG)
-
-    st.markdown("#### Factor ETFs — Flow & Price")
-    fac_flow_cols = st.columns(3)
-    for i, (tkr, name) in enumerate(FACTORS.items()):
-        fig = build_flow_chart(tkr, name, prices, volumes)
-        if fig:
-            with fac_flow_cols[i % 3]:
-                st.plotly_chart(fig, use_container_width=True,
-                                key=f"flow_{tkr}", config=PCFG)
-
-    # ── REGIME CHARTS ────────────────────────────────────────────────────────
-    st.divider()
-    st.subheader("Regime Monitor")
-
-    rc1, rc2, rc3 = st.columns(3)
-    with rc1:
-        try:
-            if len(rr_pct) > 0:
-                rr_t = rr_pct[rr_pct.index >= rr_pct.index.max() - pd.DateOffset(months=12)]
-                fig_rr = go.Figure()
-                fig_rr.add_trace(go.Scatter(
-                    x=rr_t.index, y=rr_t.values, mode="lines",
-                    line=dict(color="#1f77b4", width=2), showlegend=False))
-                fig_rr.add_hline(y=0.5, line_dash="dash", line_color="gray")
-                fig_rr.add_hrect(y0=0.25, y1=0.75, fillcolor="gray",
-                                 opacity=0.08, line_width=0)
-                fig_rr.update_layout(
-                    title=dict(text=(
-                        "<b>Rotation Ratio (Percentile)</b><br>"
-                        "<span style='font-size:11px;color:#666'>"
-                        ">0.75 sector-driven · <0.25 stock-dispersion · "
-                        "252d trailing pctile</span>"),
-                        font=dict(size=13)),
-                    template="plotly_white", height=320,
-                    yaxis_title="Percentile", yaxis=dict(range=[0, 1]),
-                    margin=dict(b=60, t=70, l=50, r=30),
-                    dragmode=False, annotations=[src_ann(-0.18)])
-                st.plotly_chart(fig_rr, use_container_width=True,
-                                key="fig_rotation", config=PCFG)
-        except Exception:
-            st.info("Rotation ratio unavailable.")
-
-    with rc2:
-        try:
-            br = compute_breadth(prices)
-            br_t = br[br.index >= br.index.max() - pd.DateOffset(months=12)]
-            br_idx = br_t / br_t.iloc[0]
-            fig_br = go.Figure()
-            fig_br.add_trace(go.Scatter(
-                x=br_idx.index, y=br_idx.values, mode="lines",
-                line=dict(color="#ff7f0e", width=2), showlegend=False))
-            fig_br.add_hline(y=1.0, line_dash="dash", line_color="gray")
-            fig_br.update_layout(
-                title=dict(text=(
-                    "<b>Breadth (RSP / SPY)</b><br>"
-                    "<span style='font-size:11px;color:#666'>"
-                    "Indexed · rising = broadening · "
-                    "falling = concentrated</span>"),
-                    font=dict(size=13)),
-                template="plotly_white", height=320, yaxis_title="Indexed",
-                margin=dict(b=60, t=70, l=50, r=30),
-                dragmode=False, annotations=[src_ann(-0.18)])
-            st.plotly_chart(fig_br, use_container_width=True,
-                            key="fig_breadth", config=PCFG)
-        except Exception:
-            st.info("Breadth data unavailable.")
-
-    with rc3:
-        try:
-            ri = compute_retail_intensity(volumes)
-            ri_t = ri[ri.index >= ri.index.max() - pd.DateOffset(months=12)]
-            fig_ri = go.Figure()
-            fig_ri.add_trace(go.Scatter(
-                x=ri_t.index, y=ri_t.values, mode="lines",
-                line=dict(color="#9467bd", width=2), showlegend=False))
-            fig_ri.add_hline(y=0, line_dash="dash", line_color="gray")
-            fig_ri.add_hrect(y0=-1, y1=1, fillcolor="gray",
-                             opacity=0.08, line_width=0)
-            fig_ri.update_layout(
-                title=dict(text=(
-                    "<b>Retail Intensity</b><br>"
-                    "<span style='font-size:11px;color:#666'>"
-                    "(TQQQ+SQQQ)/QQQ vol z-score · "
-                    ">+1 elevated · <−1 low</span>"),
-                    font=dict(size=13)),
-                template="plotly_white", height=320, yaxis_title="Z-Score",
-                margin=dict(b=60, t=70, l=50, r=30),
-                dragmode=False, annotations=[src_ann(-0.18)])
-            st.plotly_chart(fig_ri, use_container_width=True,
-                            key="fig_retail", config=PCFG)
-        except Exception:
-            st.info("Retail intensity data unavailable.")
+    if not df_all.empty:
+        df_all = df_all.sort_values("5D Ret %", ascending=False).reset_index(drop=True)
+        st.markdown("**All Sectors & Factors** — sorted by 5D return")
+        st.dataframe(
+            style_positioning_table(df_all),
+            hide_index=True, use_container_width=True,
+            height=min(35 * len(df_all) + 38, 580))
 
     # ── RELATIVE PERFORMANCE ─────────────────────────────────────────────────
     st.divider()
@@ -1010,14 +851,6 @@ with tab2:
     rel_s, alpha_s = compute_relative(prices, SECTORS)
     ri_s = reindex_from(rel_s, base_s)
     al_s = alpha_s[alpha_s.index >= pd.Timestamp(base_s)]
-    disp = ri_s.max(axis=1) - ri_s.min(axis=1)
-    sec_rets = prices[list(SECTORS.keys())].pct_change().dropna()
-    sec_rets_t = sec_rets[sec_rets.index >= pd.Timestamp(base_s)]
-    roll_corr = (
-        sec_rets_t.rolling(21).corr()
-        .groupby(level=0)
-        .apply(lambda x: float(np.nanmean(
-            x.values[np.triu_indices_from(x.values, k=1)]))))
 
     fig_s1 = go.Figure()
     for tkr, name in SECTORS.items():
@@ -1043,53 +876,127 @@ with tab2:
         margin=CM, legend=LEG, dragmode=False, annotations=[src_ann()])
     st.plotly_chart(fig_s2, use_container_width=True, key="fig_s2", config=PCFG)
 
-    disp_corr_l, disp_corr_r = st.columns(2)
-    with disp_corr_l:
-        fig_s3 = go.Figure()
-        fig_s3.add_trace(go.Scatter(x=disp.index, y=disp, mode="lines",
-                                    line=dict(color="#555", width=2), showlegend=False))
-        fig_s3.update_layout(
-            title=chart_title("Cross-Sectional Dispersion",
-                              "max − min of relative prices"),
-            template="plotly_white", height=340,
-            margin=dict(b=60, t=60, l=60, r=40),
-            dragmode=False, annotations=[src_ann(-0.18)])
-        st.plotly_chart(fig_s3, use_container_width=True, key="fig_s3", config=PCFG)
-
-    with disp_corr_r:
-        fig_s4 = go.Figure()
-        fig_s4.add_trace(go.Scatter(x=roll_corr.index, y=roll_corr.values, mode="lines",
-                                    line=dict(color="#e377c2", width=2), showlegend=False))
-        fig_s4.update_layout(
-            title=chart_title("Avg Pairwise Sector Correlation (21d)",
-                              "Higher = macro-driven · lower = sector-specific"),
-            template="plotly_white", height=340,
-            margin=dict(b=60, t=60, l=60, r=40),
-            dragmode=False, annotations=[src_ann(-0.18)])
-        st.plotly_chart(fig_s4, use_container_width=True, key="fig_s4", config=PCFG)
-
-    # ── VOLUME Z-SCORE CHARTS ────────────────────────────────────────────────
+    # ── INDIVIDUAL ETF CHARTS — Flow + Volume side by side ───────────────────
     st.divider()
-    st.subheader("Volume Z-Score & Price (Past 3 Months)")
-    st.caption("Price indexed to 1.0 · Vol z-score (252d) bars clipped ±3 · "
-               "green = above avg · red = below avg")
+    st.subheader("Individual ETF — Flow & Volume")
+    st.caption("Left: price return + flow z-score · Right: price indexed + volume z-score · "
+               "All z-scores 252-day rolling, clipped ±3")
 
-    st.markdown("#### Factor ETFs")
-    f_cols = st.columns(3)
-    for i, (tkr, name) in enumerate(FACTORS.items()):
-        fig = build_volume_chart(tkr, name, prices, volumes)
-        if fig:
-            with f_cols[i % 3]:
-                st.plotly_chart(fig, use_container_width=True,
-                                key=f"vol_{tkr}", config=PCFG)
+    chart_window_opt = st.radio(
+        "Chart window", ["3M", "6M", "1Y"],
+        horizontal=True, key="etf_chart_window")
+    chart_bdays = {"3M": 63, "6M": 126, "1Y": 252}[chart_window_opt]
+
+    def build_flow_chart(ticker, label, prices, volumes, window):
+        if ticker not in prices.columns:
+            return None
+        p = prices[ticker].dropna()
+        cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
+        p = p[p.index >= cutoff]
+        if len(p) < 10:
+            return None
+        p_idx = (p / p.iloc[0] - 1) * 100
+        fz = compute_flow_proxy_z(prices, volumes, ticker)
+        fz = fz[fz.index >= cutoff]
+        common = p_idx.index.intersection(fz.index)
+        p_idx, fz = p_idx.loc[common], fz.loc[common]
+        if len(common) < 5:
+            return None
+        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(
+            go.Bar(x=fz.index, y=fz.values, name="Flow Z",
+                   marker_color=bar_colors, opacity=0.4), secondary_y=True)
+        fig.add_trace(
+            go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
+                       mode="lines", line=dict(color="#1f77b4", width=2.5)),
+            secondary_y=False)
+        fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1,
+                      secondary_y=False)
+        fig.update_layout(
+            title=dict(text=(
+                f"<b>{label}</b> ({ticker}) — Flow<br>"
+                f"<span style='font-size:11px;color:#666'>"
+                f"Return % · Flow z-score (252d)</span>"),
+                font=dict(size=13)),
+            template="plotly_white", height=320,
+            margin=dict(b=55, t=65, l=50, r=40),
+            legend=dict(orientation="h", yanchor="top", y=-0.18,
+                        x=0.5, xanchor="center", font=dict(size=9)),
+            dragmode=False, bargap=0.1, annotations=[src_ann(-0.22)])
+        fig.update_yaxes(title_text="Ret %", secondary_y=False)
+        fig.update_yaxes(title_text="Flow Z", secondary_y=True,
+                         range=[-3.5, 3.5], dtick=1, showgrid=False)
+        return fig
+
+    def build_vol_chart(ticker, label, prices, volumes, window):
+        if ticker not in prices.columns or ticker not in volumes.columns:
+            return None
+        p = prices[ticker].dropna()
+        cutoff = p.index[-1] - pd.tseries.offsets.BDay(window)
+        p = p[p.index >= cutoff]
+        if len(p) < 10:
+            return None
+        p_idx = p / p.iloc[0]
+        z_full = compute_volume_zscore(volumes[ticker].dropna())
+        z = z_full[z_full.index >= cutoff]
+        common = p_idx.index.intersection(z.index)
+        p_idx, z = p_idx.loc[common], z.loc[common]
+        if len(common) < 5:
+            return None
+        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in z.values]
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(
+            go.Bar(x=z.index, y=z.values, name="Vol Z",
+                   marker_color=bar_colors, opacity=0.35), secondary_y=True)
+        fig.add_trace(
+            go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
+                       mode="lines", line=dict(color="#1f77b4", width=2.5)),
+            secondary_y=False)
+        fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=1,
+                      secondary_y=False)
+        fig.update_layout(
+            title=dict(text=(
+                f"<b>{label}</b> ({ticker}) — Volume<br>"
+                f"<span style='font-size:11px;color:#666'>"
+                f"Indexed price · Vol z-score (252d)</span>"),
+                font=dict(size=13)),
+            template="plotly_white", height=320,
+            margin=dict(b=55, t=65, l=50, r=40),
+            legend=dict(orientation="h", yanchor="top", y=-0.18,
+                        x=0.5, xanchor="center", font=dict(size=9)),
+            dragmode=False, bargap=0.1, annotations=[src_ann(-0.22)])
+        fig.update_yaxes(title_text="Indexed", secondary_y=False)
+        fig.update_yaxes(title_text="Vol Z", secondary_y=True,
+                         range=[-3.5, 3.5], dtick=1, showgrid=False)
+        return fig
 
     st.markdown("#### Sector ETFs")
-    s_cols = st.columns(3)
-    for i, (tkr, name) in enumerate(SECTORS.items()):
-        fig = build_volume_chart(tkr, name, prices, volumes)
-        if fig:
-            with s_cols[i % 3]:
-                st.plotly_chart(fig, use_container_width=True,
+    for tkr, name in SECTORS.items():
+        c_l, c_r = st.columns(2)
+        flow_fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
+        vol_fig = build_vol_chart(tkr, name, prices, volumes, chart_bdays)
+        if flow_fig:
+            with c_l:
+                st.plotly_chart(flow_fig, use_container_width=True,
+                                key=f"flow_{tkr}", config=PCFG)
+        if vol_fig:
+            with c_r:
+                st.plotly_chart(vol_fig, use_container_width=True,
+                                key=f"vol_{tkr}", config=PCFG)
+
+    st.markdown("#### Factor ETFs")
+    for tkr, name in FACTORS.items():
+        c_l, c_r = st.columns(2)
+        flow_fig = build_flow_chart(tkr, name, prices, volumes, chart_bdays)
+        vol_fig = build_vol_chart(tkr, name, prices, volumes, chart_bdays)
+        if flow_fig:
+            with c_l:
+                st.plotly_chart(flow_fig, use_container_width=True,
+                                key=f"flow_{tkr}", config=PCFG)
+        if vol_fig:
+            with c_r:
+                st.plotly_chart(vol_fig, use_container_width=True,
                                 key=f"vol_{tkr}", config=PCFG)
 
     # ── ETF HOLDINGS DRILL-DOWN ──────────────────────────────────────────────
@@ -1097,8 +1004,7 @@ with tab2:
     st.subheader("Sector ETF Holdings & Daily Attribution")
     st.caption(
         "Expand any sector to see top holdings, weight, daily return, "
-        "and contribution (weight × return). Sorted by |contribution|. "
-        "Weights sourced live from yfinance when available, otherwise static fallback.")
+        "and contribution (weight × return). Sorted by |contribution|.")
 
     exp_cols = st.columns(2)
     for i, (tkr, name) in enumerate(SECTORS.items()):
@@ -1160,7 +1066,7 @@ with tab3:
         if c:
             st.caption(c)
 
-    # ── Row 2: Spreads + Real Yield/Breakeven + Credit ──
+    # ── Row 2: Spreads + Real Yield + Credit ──
     r2c1, r2c2, r2c3 = st.columns(3)
     with r2c1:
         fig_sp = go.Figure()
@@ -1199,7 +1105,7 @@ with tab3:
             try:
                 s = trim(fetch_fred_series(sid), rmons) * 100
                 fig_cr.add_trace(go.Scatter(
-                    x=s.index, y=s.values, name=f"{lbl}", mode="lines"))
+                    x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception:
                 pass
         try:
