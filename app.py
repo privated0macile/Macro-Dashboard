@@ -865,6 +865,38 @@ with tab1:
     st.markdown("#### Defensive Sectors")
     _build_pair(SECTORS_DEFENSIVE, "Defensive", base, "defensive")
 
+    # ── Cyclical vs Defensive ratio ──
+    st.markdown("#### Cyclical vs Defensive")
+    try:
+        cyc_rets = prices[list(SECTORS_CYCLICAL.keys())].pct_change().mean(axis=1)
+        def_rets = prices[list(SECTORS_DEFENSIVE.keys())].pct_change().mean(axis=1)
+        cyc_cum = (1 + cyc_rets).cumprod()
+        def_cum = (1 + def_rets).cumprod()
+        ratio = cyc_cum / def_cum
+        ratio = ratio[ratio.index >= pd.Timestamp(base)]
+        ratio_idx = ratio / ratio.iloc[0]
+
+        fig_cd = go.Figure()
+        fig_cd.add_trace(go.Scatter(
+            x=ratio_idx.index, y=ratio_idx.values, mode="lines",
+            line=dict(color="#1f77b4", width=2.5), showlegend=False))
+        fig_cd.add_hline(y=1.0, line_dash="dash", line_color="gray")
+        fig_cd.update_layout(
+            title=dict(text=(
+                "<b>Cyclical / Defensive Ratio</b><br>"
+                "<span style='font-size:11px;color:#666'>"
+                "Equal-weight baskets · rising = risk-on (cyclical leading) · "
+                "falling = risk-off (defensive leading)</span>"),
+                font=dict(size=13)),
+            template="plotly_white", height=380,
+            yaxis_title="Ratio (indexed)",
+            margin=dict(b=60, t=70, l=55, r=30),
+            dragmode=False, annotations=[src_ann(-0.15)])
+        st.plotly_chart(fig_cd, use_container_width=True,
+                        key="fig_cyc_def", config=PCFG)
+    except Exception:
+        st.info("Cyclical/Defensive ratio unavailable.")
+
     # ── INDIVIDUAL ETF CHARTS — Flow only ────────────────────────────────────
     st.divider()
     st.subheader("Individual ETF — Flow & Price")
