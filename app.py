@@ -120,10 +120,9 @@ def fetch_live_holdings(etf_ticker, top_n=10):
     """Try to pull live holdings from yfinance. Returns list or None."""
     try:
         t = yf.Ticker(etf_ticker)
-        fd = t.funds_data
-        if fd is None:
+        if not hasattr(t, 'funds_data') or t.funds_data is None:
             return None
-        df = fd.top_holdings
+        df = t.funds_data.top_holdings
         if df is None or df.empty:
             return None
         result = []
@@ -199,9 +198,25 @@ def fetch_equity():
                + RETAIL_ETFS + holding_tickers
                + [BENCH, "RSP"])
     tickers = list(set(tickers))
-    raw = yf.download(tickers, start=START, auto_adjust=True, progress=False)
-    close = raw["Close"]
-    volume = raw["Volume"]
+    # Download in batches to avoid timeouts on Streamlit Cloud
+    all_close, all_vol = [], []
+    batch_size = 30
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        try:
+            raw = yf.download(batch, start=START, auto_adjust=True,
+                              progress=False, threads=True)
+            if len(batch) == 1:
+                # Single ticker returns Series not DataFrame
+                all_close.append(raw["Close"].to_frame(batch[0]))
+                all_vol.append(raw["Volume"].to_frame(batch[0]))
+            else:
+                all_close.append(raw["Close"])
+                all_vol.append(raw["Volume"])
+        except Exception:
+            continue
+    close = pd.concat(all_close, axis=1) if all_close else pd.DataFrame()
+    volume = pd.concat(all_vol, axis=1) if all_vol else pd.DataFrame()
     return close, volume
 
 @st.cache_data(ttl=3600)
