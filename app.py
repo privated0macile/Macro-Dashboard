@@ -703,9 +703,9 @@ with tab1:
                                  opacity=0.08, line_width=0)
                 fig_rr.update_layout(
                     title=dict(text=(
-                        f"<b>Rotation Ratio</b> — {rr_val:.2f} ({rr_label})<br>"
+                        f"<b>Macro vs Micro</b> — {rr_val:.2f} ({rr_label})<br>"
                         f"<span style='font-size:11px;color:#666'>"
-                        f">0.75 sector · <0.25 stock-disp</span>"),
+                        f">0.75 sector-driven · <0.25 stock-driven</span>"),
                         font=dict(size=12)),
                     template="plotly_white", height=280,
                     yaxis_title="Pctile", yaxis=dict(range=[0, 1]),
@@ -749,33 +749,34 @@ with tab1:
 
     with rc3:
         try:
-            ri = compute_retail_intensity(volumes)
-            if len(ri) > 0:
-                ri_val = ri.iloc[-1]
-                ri_label = ("Elevated" if ri_val > 1.0
-                            else "Low" if ri_val < -1.0
-                            else "Normal")
-                ri_t = ri[ri.index >= ri.index.max() - pd.DateOffset(months=12)]
-                fig_ri = go.Figure()
-                fig_ri.add_trace(go.Scatter(
-                    x=ri_t.index, y=ri_t.values, mode="lines",
-                    line=dict(color="#9467bd", width=2), showlegend=False))
-                fig_ri.add_hline(y=0, line_dash="dash", line_color="gray")
-                fig_ri.add_hrect(y0=-1, y1=1, fillcolor="gray",
-                                 opacity=0.08, line_width=0)
-                fig_ri.update_layout(
-                    title=dict(text=(
-                        f"<b>Retail Intensity</b> — {ri_val:+.2f}σ ({ri_label})<br>"
-                        f"<span style='font-size:11px;color:#666'>"
-                        f"(TQQQ+SQQQ)/QQQ vol z</span>"),
-                        font=dict(size=12)),
-                    template="plotly_white", height=280, yaxis_title="Z-Score",
-                    margin=dict(b=45, t=65, l=45, r=25),
-                    dragmode=False)
-                st.plotly_chart(fig_ri, use_container_width=True,
-                                key="fig_retail", config=PCFG)
+            cyc_rets = prices[list(SECTORS_CYCLICAL.keys())].pct_change().mean(axis=1)
+            def_rets = prices[list(SECTORS_DEFENSIVE.keys())].pct_change().mean(axis=1)
+            cyc_cum = (1 + cyc_rets).cumprod()
+            def_cum = (1 + def_rets).cumprod()
+            ratio = cyc_cum / def_cum
+            ratio_12m = ratio[ratio.index >= ratio.index.max() - pd.DateOffset(months=12)]
+            ratio_idx = ratio_12m / ratio_12m.iloc[0]
+            cd_now = ratio_idx.iloc[-1]
+            cd_label = ("Risk-on" if cd_now > 1.005
+                        else "Risk-off" if cd_now < 0.995 else "Neutral")
+            fig_cd = go.Figure()
+            fig_cd.add_trace(go.Scatter(
+                x=ratio_idx.index, y=ratio_idx.values, mode="lines",
+                line=dict(color="#2ca02c", width=2), showlegend=False))
+            fig_cd.add_hline(y=1.0, line_dash="dash", line_color="gray")
+            fig_cd.update_layout(
+                title=dict(text=(
+                    f"<b>Cyclical / Defensive</b> — {cd_now:.4f} ({cd_label})<br>"
+                    f"<span style='font-size:11px;color:#666'>"
+                    f"Rising = risk-on · falling = risk-off</span>"),
+                    font=dict(size=12)),
+                template="plotly_white", height=280, yaxis_title="Ratio",
+                margin=dict(b=45, t=65, l=45, r=25),
+                dragmode=False)
+            st.plotly_chart(fig_cd, use_container_width=True,
+                            key="fig_cyc_def_regime", config=PCFG)
         except Exception:
-            st.info("Retail intensity data unavailable.")
+            st.info("Cyclical/Defensive unavailable.")
 
     with rc4:
         try:
@@ -864,38 +865,6 @@ with tab1:
 
     st.markdown("#### Defensive Sectors")
     _build_pair(SECTORS_DEFENSIVE, "Defensive", base, "defensive")
-
-    # ── Cyclical vs Defensive ratio ──
-    st.markdown("#### Cyclical vs Defensive")
-    try:
-        cyc_rets = prices[list(SECTORS_CYCLICAL.keys())].pct_change().mean(axis=1)
-        def_rets = prices[list(SECTORS_DEFENSIVE.keys())].pct_change().mean(axis=1)
-        cyc_cum = (1 + cyc_rets).cumprod()
-        def_cum = (1 + def_rets).cumprod()
-        ratio = cyc_cum / def_cum
-        ratio = ratio[ratio.index >= pd.Timestamp(base)]
-        ratio_idx = ratio / ratio.iloc[0]
-
-        fig_cd = go.Figure()
-        fig_cd.add_trace(go.Scatter(
-            x=ratio_idx.index, y=ratio_idx.values, mode="lines",
-            line=dict(color="#1f77b4", width=2.5), showlegend=False))
-        fig_cd.add_hline(y=1.0, line_dash="dash", line_color="gray")
-        fig_cd.update_layout(
-            title=dict(text=(
-                "<b>Cyclical / Defensive Ratio</b><br>"
-                "<span style='font-size:11px;color:#666'>"
-                "Equal-weight baskets · rising = risk-on (cyclical leading) · "
-                "falling = risk-off (defensive leading)</span>"),
-                font=dict(size=13)),
-            template="plotly_white", height=380,
-            yaxis_title="Ratio (indexed)",
-            margin=dict(b=60, t=70, l=55, r=30),
-            dragmode=False, annotations=[src_ann(-0.15)])
-        st.plotly_chart(fig_cd, use_container_width=True,
-                        key="fig_cyc_def", config=PCFG)
-    except Exception:
-        st.info("Cyclical/Defensive ratio unavailable.")
 
     # ── INDIVIDUAL ETF CHARTS — Flow only ────────────────────────────────────
     st.divider()
