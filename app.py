@@ -566,7 +566,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 tab1, tab2, tab3 = st.tabs(
-    ["Markets", "Rates & Macro", "Calendar"]
+    ["Equities", "Fixed Income & Macro", "Calendar"]
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -576,7 +576,7 @@ with tab1:
     with st.spinner("Loading equity data…"):
         prices, volumes = fetch_equity()
 
-    # ── Header: Indices + Key Releases ───────────────────────────────────────
+    # ── Header: Indices + Top/Bottom positioning ────────────────────────────
     hdr_l, hdr_r = st.columns([3, 2])
 
     with hdr_l:
@@ -617,23 +617,48 @@ with tab1:
                         key="fig_idx_overview", config=PCFG)
 
     with hdr_r:
-        st.subheader("Key Releases")
-        try:
-            snap = fetch_release_snapshot()
-            if not snap.empty:
-                display_snap = snap[["Release", "Next Release", "Latest", "Unit"]].copy()
-                st.dataframe(display_snap, hide_index=True,
-                             use_container_width=True, height=300)
-        except Exception:
-            st.info("Release data unavailable.")
-        all_fomc = FOMC["2025"] + FOMC["2026"]
-        today_d = datetime.today().date()
-        nxt = next(((l, d) for l, d in all_fomc
-                    if datetime.strptime(d, "%Y-%m-%d").date() >= today_d), None)
-        if nxt:
-            lbl, d = nxt
-            days_away = (datetime.strptime(d, "%Y-%m-%d").date() - today_d).days
-            st.caption(f"**Next FOMC:** {lbl} — {days_away} days away")
+        pos_freq = st.radio(
+            "Return period", ["1D", "5D", "1M", "12M"],
+            horizontal=True, key="pos_freq")
+        ret_days = {"1D": 1, "5D": 5, "1M": 21, "12M": 252}[pos_freq]
+        df_sec = build_positioning_table(prices, volumes, SECTORS, ret_days)
+        df_fac = build_positioning_table(prices, volumes, FACTORS, ret_days)
+        df_all = pd.concat([df_sec, df_fac], ignore_index=True)
+
+        if not df_all.empty and "Composite" in df_all.columns:
+            df_ranked = df_all.dropna(subset=["Composite"]).sort_values(
+                "Composite", ascending=False).reset_index(drop=True)
+            top3 = df_ranked.head(3)
+            bot3 = df_ranked.tail(3)
+            df_display = pd.concat([top3, bot3], ignore_index=True)
+            df_display = df_display.rename(columns={"Return %": f"{pos_freq} Ret %"})
+            st.markdown(f"**Top 3 / Bottom 3 by Composite** — {pos_freq} return")
+            def _style_topbot(df_d):
+                def _cz(val):
+                    if pd.isna(val): return ""
+                    if val >= 2:  return "color:#2ca02c;font-weight:bold"
+                    if val <= -2: return "color:#d62728;font-weight:bold"
+                    if val >= 1:  return "color:#2ca02c"
+                    if val <= -1: return "color:#d62728"
+                    return ""
+                def _cr(val):
+                    if pd.isna(val): return ""
+                    return "color:#2ca02c" if val > 0 else "color:#d62728" if val < 0 else ""
+                s = df_d.style
+                for c in ["Flow Z", "Signed Vol Z", "Composite"]:
+                    if c in df_d.columns:
+                        s = s.map(_cz, subset=[c])
+                ret_col = f"{pos_freq} Ret %"
+                if ret_col in df_d.columns:
+                    s = s.map(_cr, subset=[ret_col])
+                fmt = {}
+                for c in [ret_col, "Flow Z", "Signed Vol Z", "Composite"]:
+                    if c in df_d.columns:
+                        fmt[c] = "{:+.2f}"
+                s = s.format(fmt, na_rep="—")
+                return s
+            st.dataframe(_style_topbot(df_display),
+                         hide_index=True, use_container_width=True, height=248)
 
     st.divider()
 
@@ -748,12 +773,10 @@ with tab1:
     with rc4:
         try:
             spy_vol = volumes["SPY"].dropna()
-            # Z-score against trailing 1Y median & std
             sv_1y = spy_vol[spy_vol.index >= spy_vol.index.max() - pd.DateOffset(months=12)]
             sv_med = sv_1y.median()
             sv_std = sv_1y.std()
             sv_z_full = ((spy_vol - sv_med) / sv_std).clip(-3, 3)
-            # Display 3M
             cutoff_3m = spy_vol.index.max() - pd.DateOffset(months=3)
             sv_z = sv_z_full[sv_z_full.index >= cutoff_3m]
             sv_z_now = sv_z.iloc[-1]
@@ -779,52 +802,6 @@ with tab1:
                             key="fig_spy_vol", config=PCFG)
         except Exception:
             st.info("SPY volume unavailable.")
-
-    # ── Positioning table: top 3 + bottom 3 ──
-    pos_freq = st.radio(
-        "Return period", ["1D", "5D", "1M", "12M"],
-        horizontal=True, key="pos_freq")
-    ret_days = {"1D": 1, "5D": 5, "1M": 21, "12M": 252}[pos_freq]
-
-    df_sec = build_positioning_table(prices, volumes, SECTORS, ret_days)
-    df_fac = build_positioning_table(prices, volumes, FACTORS, ret_days)
-    df_all = pd.concat([df_sec, df_fac], ignore_index=True)
-
-    if not df_all.empty and "Composite" in df_all.columns:
-        df_ranked = df_all.dropna(subset=["Composite"]).sort_values(
-            "Composite", ascending=False).reset_index(drop=True)
-        top3 = df_ranked.head(3)
-        bot3 = df_ranked.tail(3)
-        df_display = pd.concat([top3, bot3], ignore_index=True)
-        df_display = df_display.rename(columns={"Return %": f"{pos_freq} Ret %"})
-        st.markdown(f"**Top 3 / Bottom 3 by Composite** — {pos_freq} return")
-        # Re-apply styling with renamed column
-        def _style_topbot(df_d):
-            def _cz(val):
-                if pd.isna(val): return ""
-                if val >= 2:  return "color:#2ca02c;font-weight:bold"
-                if val <= -2: return "color:#d62728;font-weight:bold"
-                if val >= 1:  return "color:#2ca02c"
-                if val <= -1: return "color:#d62728"
-                return ""
-            def _cr(val):
-                if pd.isna(val): return ""
-                return "color:#2ca02c" if val > 0 else "color:#d62728" if val < 0 else ""
-            s = df_d.style
-            for c in ["Flow Z", "Signed Vol Z", "Composite"]:
-                if c in df_d.columns:
-                    s = s.map(_cz, subset=[c])
-            ret_col = f"{pos_freq} Ret %"
-            if ret_col in df_d.columns:
-                s = s.map(_cr, subset=[ret_col])
-            fmt = {}
-            for c in [ret_col, "Flow Z", "Signed Vol Z", "Composite"]:
-                if c in df_d.columns:
-                    fmt[c] = "{:+.2f}"
-            s = s.format(fmt, na_rep="—")
-            return s
-        st.dataframe(_style_topbot(df_display),
-                     hide_index=True, use_container_width=True, height=248)
 
     # ── RELATIVE PERFORMANCE ─────────────────────────────────────────────────
     st.divider()
