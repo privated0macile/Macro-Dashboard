@@ -41,17 +41,29 @@ SRC_YF = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
-FACTORS = {"MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value", "USMV": "Min Vol", "HDV": "Yield"}
+FACTORS = {"HDV": "Yield", "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "USMV": "Min Vol", "VLUE": "Value"}
 SECTORS = {
-    "XLK": "Info. Tech", "XLF": "Financials", "XLE": "Energy",
-    "XLV": "Healthcare", "XLI": "Industrials", "XLY": "Cons. Disc.",
-    "XLP": "Cons. Staples", "XLB": "Materials", "XLU": "Utilities",
-    "XLRE": "Real Estate", "XLC": "Comm. Serv."
+    "XLC": "Comm. Serv.", "XLY": "Cons. Disc.", "XLP": "Cons. Staples",
+    "XLE": "Energy", "XLF": "Financials", "XLV": "Healthcare",
+    "XLI": "Industrials", "XLK": "Info. Tech", "XLB": "Materials",
+    "XLRE": "Real Estate", "XLU": "Utilities"
 }
-SECTORS_CYCLICAL = {"XLE": "Energy", "XLB": "Materials", "XLI": "Industrials",
-    "XLY": "Cons. Disc.", "XLF": "Financials", "XLK": "Info. Tech", "XLC": "Comm. Serv."}
-SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare",
-    "XLU": "Utilities", "XLRE": "Real Estate"}
+SECTORS_CYCLICAL = {
+    "XLC": "Comm. Serv.", "XLY": "Cons. Disc.", "XLE": "Energy",
+    "XLF": "Financials", "XLI": "Industrials", "XLK": "Info. Tech", "XLB": "Materials"
+}
+SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare", "XLRE": "Real Estate", "XLU": "Utilities"}
+
+SECTOR_COLORS = {
+    "XLK": "#1F77B4", "XLV": "#2CA02C", "XLC": "#6A3D9A",
+    "XLP": "#E6AB02", "XLY": "#D94801", "XLI": "#7A7A7A",
+    "XLU": "#4D4D4D", "XLE": "#145A32", "XLB": "#A0522D",
+    "XLF": "#1B263B", "XLRE": "#8D6E63"
+}
+FACTOR_COLORS = {
+    "MTUM": "#1F77B4", "QUAL": "#2CA02C", "VLUE": "#1B263B",
+    "SIZE": "#D94801", "USMV": "#4D4D4D", "HDV": "#E6AB02"
+}
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
 EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE", "XLC": "RSPC"}
@@ -550,7 +562,10 @@ with tab1:
         with cl:
             fig = go.Figure()
             for t, n in ad.items():
-                if t in ri.columns: fig.add_trace(go.Scatter(x=ri.index, y=ri[t], name=n, mode="lines"))
+                if t in ri.columns:
+                    c = SECTOR_COLORS.get(t) or FACTOR_COLORS.get(t)
+                    fig.add_trace(go.Scatter(x=ri.index, y=ri[t], name=n, mode="lines",
+                        line=dict(color=c, width=2) if c else dict(width=2)))
             fig.add_hline(y=1.0, line_dash="dash", line_color="gray")
             fig.update_layout(title=chart_title(f"{gl} Relative Performance","ETF / SPY, indexed to 1.0"),
                 template="plotly_white", height=380, margin=dict(b=90,t=50,l=55,r=30), legend=LEG, dragmode=False)
@@ -559,7 +574,10 @@ with tab1:
         with cr2:
             fig = go.Figure()
             for t, n in ad.items():
-                if t in al.columns: fig.add_trace(go.Scatter(x=al.index, y=al[t], name=n, mode="lines"))
+                if t in al.columns:
+                    c = SECTOR_COLORS.get(t) or FACTOR_COLORS.get(t)
+                    fig.add_trace(go.Scatter(x=al.index, y=al[t], name=n, mode="lines",
+                        line=dict(color=c, width=2) if c else dict(width=2)))
             fig.add_hline(y=0.0, line_dash="dash", line_color="gray")
             fig.update_layout(title=chart_title(f"{gl} Rolling 6M Alpha","Compounded 126-day relative return"),
                 template="plotly_white", height=380, margin=dict(b=90,t=50,l=55,r=30), legend=LEG, dragmode=False)
