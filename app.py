@@ -416,6 +416,7 @@ with tab1:
             t3, b3 = df_pos.head(3), df_pos.tail(3)
             dd = pd.concat([t3, b3], ignore_index=True)
             st.markdown("**Top 3 / Bottom 3 by Composite**")
+            st.caption("Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3")
             def _sty(d):
                 def cz(v):
                     if pd.isna(v): return ""
@@ -441,10 +442,10 @@ with tab1:
 
     # ── Daily Positioning Feed ──
     st.subheader("Daily Positioning Feed")
-    st.caption("Flow Z = residual dollar-volume change (accumulation/distribution) / "
-               "Signed Vol Z = directional participation / "
-               "Composite = (Flow Z + Signed Vol Z + Return Z) / 3 / "
-               "All 252-day rolling, clipped +/-3.")
+    st.caption("Macro vs Micro = between-sector vs within-sector dispersion (252d percentile rank) / "
+               "Breadth = RSP/SPY ratio (equal-weight vs cap-weight) / "
+               "Cyclical/Defensive = equal-weight basket ratio / "
+               "SPY Volume = volume z-scored against 1Y median.")
 
     # ── Regime charts ──
     regime_window = st.radio("Regime window", ["3M","6M","12M"], horizontal=True, key="regime_window", index=2)
