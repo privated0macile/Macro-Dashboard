@@ -723,10 +723,10 @@ with tab1:
                         f"<span style='font-size:11px;color:#666'>"
                         f">0.75 sector-driven · <0.25 stock-driven</span>"),
                         font=dict(size=12)),
-                    template="plotly_white", height=280,
+                    template="plotly_white", height=300,
                     yaxis_title="%-tile", yaxis=dict(range=[0, 1], dtick=0.25),
-                    margin=dict(b=45, t=65, l=45, r=25),
-                    dragmode=False, annotations=[src_ann(-0.12)])
+                    margin=dict(b=55, t=65, l=45, r=25),
+                    dragmode=False, annotations=[src_ann(-0.18)])
                 st.plotly_chart(fig_rr, use_container_width=True,
                                 key="fig_rotation", config=PCFG)
             else:
@@ -755,9 +755,9 @@ with tab1:
                         f"<span style='font-size:11px;color:#666'>"
                         f"RSP/SPY · rising = broadening</span>"),
                         font=dict(size=12)),
-                    template="plotly_white", height=280, yaxis_title="Indexed",
-                    margin=dict(b=45, t=65, l=45, r=25),
-                    dragmode=False, annotations=[src_ann(-0.12)])
+                    template="plotly_white", height=300, yaxis_title="Indexed",
+                    margin=dict(b=55, t=65, l=45, r=25),
+                    dragmode=False, annotations=[src_ann(-0.18)])
                 st.plotly_chart(fig_br, use_container_width=True,
                                 key="fig_breadth", config=PCFG)
         except Exception:
@@ -818,10 +818,10 @@ with tab1:
                     f"<span style='font-size:11px;color:#666'>"
                     f"0 = 1Y median · 3M window · ±3</span>"),
                     font=dict(size=12)),
-                template="plotly_white", height=280, yaxis_title="Z-Score",
+                template="plotly_white", height=300, yaxis_title="Z-Score",
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
-                margin=dict(b=45, t=65, l=45, r=25),
-                bargap=0.15, dragmode=False, annotations=[src_ann(-0.12)])
+                margin=dict(b=55, t=65, l=45, r=25),
+                bargap=0.15, dragmode=False, annotations=[src_ann(-0.18)])
             st.plotly_chart(fig_sv, use_container_width=True,
                             key="fig_spy_vol", config=PCFG)
         except Exception:
@@ -1021,8 +1021,15 @@ with tab2:
                   horizontal=True, key="rp")
     rmons = {"1Y": 12, "3Y": 36, "5Y": 60, "10Y": 120, "Full": None}[rp]
 
-    # ── Row 1: Yields + Yield Curve ──
-    yld_col, yc_col = st.columns([3, 2])
+    # ── Row 1: Yield Curve + Yields ──
+    yc_col, yld_col = st.columns(2)
+    with yc_col:
+        st.plotly_chart(build_yield_curve(), use_container_width=True,
+                        key="yc_rates", config=PCFG)
+        c = yield_curve_commentary()
+        if c:
+            st.caption(c)
+
     with yld_col:
         colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
         fig_y = go.Figure()
@@ -1040,13 +1047,6 @@ with tab2:
             margin=dict(b=90, t=50, l=55, r=30), legend=LEG,
             dragmode=False, annotations=[src_ann(-0.22)])
         st.plotly_chart(fig_y, use_container_width=True, key="fig_yields", config=PCFG)
-
-    with yc_col:
-        st.plotly_chart(build_yield_curve(), use_container_width=True,
-                        key="yc_rates", config=PCFG)
-        c = yield_curve_commentary()
-        if c:
-            st.caption(c)
 
     # ── Row 2: Spreads + Real Yield + Credit ──
     r2c1, r2c2, r2c3 = st.columns(3)
