@@ -41,7 +41,7 @@ SRC_YF = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
-FACTORS = {"MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value", "USMV": "Min Vol"}
+FACTORS = {"MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value", "USMV": "Min Vol", "HDV": "Yield"}
 SECTORS = {
     "XLK": "Info. Tech", "XLF": "Financials", "XLE": "Energy",
     "XLV": "Healthcare", "XLI": "Industrials", "XLY": "Cons. Disc.",
