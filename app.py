@@ -617,10 +617,10 @@ with tab1:
                 if len(s) > 1:
                     indexed = (s / s.iloc[0] - 1) * 100
                     fig_idx.add_trace(go.Scatter(
-                        x=indexed.index, y=indexed.values,
+                        x=indexed.index, y=round(indexed, 2).values,
                         name=name, mode="lines",
                         line=dict(color=idx_colors.get(tkr, "#999"), width=2.5),
-                        customdata=s.values,
+                        customdata=np.round(s.values, 2),
                         hovertemplate=(
                             f"<b>{name}</b><br>"
                             "Date: %{x|%b %d, %Y}<br>"
