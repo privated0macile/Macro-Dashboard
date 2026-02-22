@@ -43,13 +43,13 @@ CHART_WINDOW = 63
 
 FACTORS = {"MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value", "USMV": "Min Vol"}
 SECTORS = {
-    "XLK": "Technology", "XLF": "Financials", "XLE": "Energy",
+    "XLK": "Info. Tech", "XLF": "Financials", "XLE": "Energy",
     "XLV": "Healthcare", "XLI": "Industrials", "XLY": "Cons. Disc.",
     "XLP": "Cons. Staples", "XLB": "Materials", "XLU": "Utilities",
-    "XLRE": "Real Estate", "XLC": "Comm. Services"
+    "XLRE": "Real Estate", "XLC": "Comm. Serv."
 }
 SECTORS_CYCLICAL = {"XLE": "Energy", "XLB": "Materials", "XLI": "Industrials",
-    "XLY": "Cons. Disc.", "XLF": "Financials", "XLK": "Technology", "XLC": "Comm. Services"}
+    "XLY": "Cons. Disc.", "XLF": "Financials", "XLK": "Info. Tech", "XLC": "Comm. Serv."}
 SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare",
     "XLU": "Utilities", "XLRE": "Real Estate"}
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
