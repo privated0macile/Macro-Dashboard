@@ -40,6 +40,10 @@ DISCLAIMER = (
     "Consult a qualified financial advisor before making any investment decisions.*"
 )
 
+SOURCE_HTML = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED · Yahoo Finance</p>'
+SOURCE_FRED = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED</p>'
+SOURCE_YF = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: Yahoo Finance</p>'
+
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
@@ -56,6 +60,11 @@ SECTORS = {
 INDICES = {
     "SPY": "S&P 500", "QQQ": "Nasdaq 100",
     "IWM": "Russell 2000", "DIA": "Dow 30"
+}
+# Actual index tickers for the overview chart (show real index prices on hover)
+INDICES_CHART = {
+    "^GSPC": "S&P 500", "^IXIC": "Nasdaq",
+    "^RUT": "Russell 2000", "^DJI": "Dow 30"
 }
 EW_SECTORS = {
     "XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH",
@@ -196,7 +205,8 @@ def fetch_equity():
         for tkr, _, _ in stocks:
             holding_tickers.append(tkr)
     tickers = (list(FACTORS.keys()) + list(SECTORS.keys())
-               + list(INDICES.keys()) + list(EW_SECTORS.values())
+               + list(INDICES.keys()) + list(INDICES_CHART.keys())
+               + list(EW_SECTORS.values())
                + RETAIL_ETFS + holding_tickers
                + [BENCH, "RSP"])
     tickers = list(set(tickers))
@@ -311,7 +321,7 @@ def reindex_from(df, base_date):
 
 def src_ann(y=-0.30):
     return dict(
-        text="Source: FRED / Yahoo Finance",
+        text="Source: FRED · Yahoo Finance",
         xref="paper", yref="paper", x=1.0, y=y,
         showarrow=False, font=dict(size=10, color="#888888"), xanchor="right")
 
@@ -596,11 +606,11 @@ with tab1:
             months = {"1M": 1, "3M": 3, "6M": 6, "1Y": 12}[idx_period]
             idx_start = latest - pd.DateOffset(months=months)
         idx_colors = {
-            "SPY": "#1f77b4", "QQQ": "#ff7f0e",
-            "IWM": "#2ca02c", "DIA": "#d62728"
+            "^GSPC": "#1f77b4", "^IXIC": "#ff7f0e",
+            "^RUT": "#2ca02c", "^DJI": "#d62728"
         }
         fig_idx = go.Figure()
-        for tkr, name in INDICES.items():
+        for tkr, name in INDICES_CHART.items():
             if tkr in prices.columns:
                 s = prices[tkr].dropna()
                 s = s[s.index >= idx_start]
@@ -615,12 +625,12 @@ with tab1:
                             f"<b>{name}</b><br>"
                             "Date: %{x|%b %d, %Y}<br>"
                             "Return: %{y:+.2f}%<br>"
-                            "Price: $%{customdata:,.2f}"
+                            "Level: %{customdata:,.2f}"
                             "<extra></extra>"
                         )))
         fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_idx.update_layout(
-            title=chart_title("Index Returns", f"{idx_period} cumulative % return"),
+            title=chart_title("U.S. Major Indices", f"{idx_period} cumulative return"),
             template="plotly_white", height=340,
             yaxis_title="Return (%)",
             margin=dict(b=80, t=60, l=55, r=40),
@@ -671,7 +681,7 @@ with tab1:
                 return s
             st.dataframe(_style_topbot(df_display),
                          hide_index=True, use_container_width=True, height=248)
-            st.caption("Source: FRED · Yahoo Finance")
+            st.markdown(SOURCE_HTML, unsafe_allow_html=True)
 
     st.divider()
 
@@ -974,7 +984,7 @@ with tab1:
                         st.info("Holdings data unavailable.")
                 except Exception:
                     st.info("Holdings data unavailable.")
-    st.caption("Source: Yahoo Finance · Weights approximate")
+    st.markdown(SOURCE_YF, unsafe_allow_html=True)
 
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>',
@@ -1004,7 +1014,7 @@ with tab2:
         except Exception:
             col.metric(label, "N/A")
 
-    st.caption("Source: FRED")
+    st.markdown(SOURCE_FRED, unsafe_allow_html=True)
     st.divider()
 
     rp = st.radio("Period", ["1Y", "3Y", "5Y", "10Y", "Full"],
@@ -1191,7 +1201,7 @@ with tab3:
                     snap.style.apply(snap_color, axis=1)
                         .format({"Previous": safe_fmt, "Latest": safe_fmt}, na_rep="—"),
                     hide_index=True, use_container_width=True, height=420)
-                st.caption("Source: FRED")
+                st.markdown(SOURCE_FRED, unsafe_allow_html=True)
 
         st.divider()
         st.subheader("Release Calendar")
@@ -1215,7 +1225,7 @@ with tab3:
                 st.dataframe(
                     disp_cal.style.apply(cal_style, axis=1),
                     hide_index=True, use_container_width=True, height=520)
-                st.caption("Source: FRED")
+                st.markdown(SOURCE_FRED, unsafe_allow_html=True)
 
     with col_right:
         st.subheader("FOMC Dates")
