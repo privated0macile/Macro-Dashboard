@@ -377,8 +377,8 @@ with tab1:
                         hovertemplate=f"<b>{n}</b><br>Date: %{{x|%b %d, %Y}}<br>Return: %{{y:+.2f}}%<br>Level: %{{customdata:,.2f}}<extra></extra>"))
         fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_idx.update_layout(title=chart_title("U.S. Major Indices", f"{idx_period} cumulative return"),
-            template="plotly_white", height=340, yaxis_title="Return (%)",
-            margin=dict(b=80,t=60,l=55,r=40), legend=dict(orientation="h",yanchor="top",y=-0.22,x=0.5,xanchor="center"),
+            template="plotly_white", height=260, yaxis_title="Return (%)",
+            margin=dict(b=70,t=50,l=55,r=40), legend=dict(orientation="h",yanchor="top",y=-0.28,x=0.5,xanchor="center"),
             dragmode=False)
         add_src(fig_idx, -0.28)
         st.plotly_chart(fig_idx, use_container_width=True, key="fig_idx", config=PCFG)
@@ -410,7 +410,7 @@ with tab1:
                 if rc in d.columns: s = s.map(cr2, subset=[rc])
                 fmt = {c: "{:+.2f}" for c in [rc,"Flow Z","Signed Vol Z","Composite"] if c in d.columns}
                 return s.format(fmt, na_rep="---")
-            st.dataframe(_sty(dd), hide_index=True, use_container_width=True, height=248)
+            st.dataframe(_sty(dd), hide_index=True, use_container_width=True, height=230)
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
@@ -441,7 +441,7 @@ with tab1:
                 fig.add_hline(y=0.5, line_dash="dash", line_color="gray")
                 fig.add_hrect(y0=0.25, y1=0.75, fillcolor="gray", opacity=0.08, line_width=0)
                 fig.update_layout(title=dict(text=f"<b>Macro vs Micro</b> -- {rv:.2f} ({rl})<br><span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>", font=dict(size=12)),
-                    template="plotly_white", height=320, yaxis_title="%-tile", yaxis=dict(range=[0,1],dtick=0.25),
+                    template="plotly_white", height=380, yaxis_title="%-tile", yaxis=dict(range=[0,1],dtick=0.25),
                     margin=dict(b=70,t=65,l=45,r=25), dragmode=False)
                 add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key="fig_rotation", config=PCFG)
@@ -460,7 +460,7 @@ with tab1:
                 fig.add_trace(go.Scatter(x=bi.index, y=bi.values, mode="lines", line=dict(color="#ff7f0e",width=2), showlegend=False))
                 fig.add_hline(y=1.0, line_dash="dash", line_color="gray")
                 fig.update_layout(title=dict(text=f"<b>Breadth</b> -- {bn:.4f} ({bl})<br><span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>", font=dict(size=12)),
-                    template="plotly_white", height=320, yaxis_title="Indexed", margin=dict(b=70,t=65,l=45,r=25), dragmode=False)
+                    template="plotly_white", height=380, yaxis_title="Indexed", margin=dict(b=70,t=65,l=45,r=25), dragmode=False)
                 add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key="fig_breadth", config=PCFG)
         except Exception: st.info("Breadth data unavailable.")
@@ -476,7 +476,7 @@ with tab1:
             fig.add_trace(go.Scatter(x=ri2.index, y=ri2.values, mode="lines", line=dict(color="#2ca02c",width=2), showlegend=False))
             fig.add_hline(y=1.0, line_dash="dash", line_color="gray")
             fig.update_layout(title=dict(text=f"<b>Cyclical / Defensive</b> -- {cn:.4f} ({cl})<br><span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>", font=dict(size=12)),
-                template="plotly_white", height=320, yaxis_title="Ratio", margin=dict(b=70,t=65,l=45,r=25), dragmode=False)
+                template="plotly_white", height=380, yaxis_title="Ratio", margin=dict(b=70,t=65,l=45,r=25), dragmode=False)
             add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key="fig_cyc_def", config=PCFG)
         except Exception: st.info("Cyclical/Defensive unavailable.")
@@ -496,7 +496,7 @@ with tab1:
             fig.add_hline(y=2, line_dash="dot", line_color="#2ca02c", line_width=0.8)
             fig.add_hline(y=-2, line_dash="dot", line_color="#d62728", line_width=0.8)
             fig.update_layout(title=dict(text=f"<b>SPY Volume</b> -- {szn:+.2f}s today<br><span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>", font=dict(size=12)),
-                template="plotly_white", height=320, yaxis_title="Z-Score", yaxis=dict(range=[-3.5,3.5],dtick=1),
+                template="plotly_white", height=380, yaxis_title="Z-Score", yaxis=dict(range=[-3.5,3.5],dtick=1),
                 margin=dict(b=70,t=65,l=45,r=25), bargap=0.15, dragmode=False)
             add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key="fig_spy_vol", config=PCFG)
