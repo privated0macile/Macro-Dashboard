@@ -55,14 +55,25 @@ SECTORS_CYCLICAL = {
 SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare", "XLRE": "Real Estate", "XLU": "Utilities"}
 
 SECTOR_COLORS = {
-    "XLK": "#1F4E79", "XLV": "#2E8B57", "XLC": "#6B4C9A",
-    "XLY": "#C05600", "XLP": "#B38F00", "XLI": "#6C757D",
-    "XLU": "#444444", "XLE": "#14532D", "XLB": "#8B5A2B",
-    "XLF": "#1B263B", "XLRE": "#8A7967"
+    "XLK": "#4285F4",   # blue
+    "XLV": "#34A853",   # green
+    "XLC": "#9333EA",   # purple
+    "XLY": "#EA580C",   # orange
+    "XLP": "#CA8A04",   # dark gold
+    "XLI": "#6B7280",   # gray
+    "XLU": "#DC2626",   # red
+    "XLE": "#166534",   # forest green
+    "XLB": "#92400E",   # brown
+    "XLF": "#1E3A5F",   # navy
+    "XLRE": "#0891B2",  # teal
 }
 FACTOR_COLORS = {
-    "MTUM": "#1F4E79", "VLUE": "#7A1F2B", "QUAL": "#1B6F6A",
-    "SIZE": "#C05600", "HDV": "#B38F00", "USMV": "#5A5A5A"
+    "MTUM": "#4285F4",  # blue
+    "VLUE": "#DC2626",  # red
+    "QUAL": "#34A853",  # green
+    "SIZE": "#EA580C",  # orange
+    "USMV": "#6B7280",  # gray
+    "HDV": "#CA8A04",   # gold
 }
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
