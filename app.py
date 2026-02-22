@@ -54,7 +54,7 @@ SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare",
     "XLU": "Utilities", "XLRE": "Real Estate"}
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
-EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE"}
+EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE", "XLC": "RSPC"}
 RETAIL_ETFS = ["TQQQ", "SQQQ"]
 
 HOLDINGS = {
