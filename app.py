@@ -54,7 +54,7 @@ SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare",
     "XLU": "Utilities", "XLRE": "Real Estate"}
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
-EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE", "XLC": "EWCO"}
+EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE"}
 RETAIL_ETFS = ["TQQQ", "SQQQ"]
 
 HOLDINGS = {
@@ -175,7 +175,9 @@ def fetch_fred_calendar():
 def to_yoy(s): return s.pct_change(12)*100
 def trim(s, m): return s[s.index >= s.index.max()-pd.DateOffset(months=m)] if m else s
 def compute_relative(p, d):
-    rel = p[list(d.keys())].div(p[BENCH], axis=0)
+    avail = [k for k in d.keys() if k in p.columns]
+    if not avail or BENCH not in p.columns: return pd.DataFrame(), pd.DataFrame()
+    rel = p[avail].div(p[BENCH], axis=0)
     alpha = (1+rel.pct_change()).rolling(ROLL).apply(np.prod, raw=True)-1
     return rel, alpha
 def reindex_from(df, bd):
