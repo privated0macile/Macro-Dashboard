@@ -41,7 +41,7 @@ SRC_YF = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
-FACTORS = {"HDV": "Yield", "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "USMV": "Min Vol", "VLUE": "Value"}
+FACTORS = {"USMV": "Min Vol", "MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value", "HDV": "Yield"}
 SECTORS = {
     "XLC": "Comm. Serv.", "XLY": "Cons. Disc.", "XLP": "Cons. Staples",
     "XLE": "Energy", "XLF": "Financials", "XLV": "Healthcare",
@@ -55,14 +55,14 @@ SECTORS_CYCLICAL = {
 SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare", "XLRE": "Real Estate", "XLU": "Utilities"}
 
 SECTOR_COLORS = {
-    "XLK": "#1F77B4", "XLV": "#2CA02C", "XLC": "#6A3D9A",
-    "XLP": "#E6AB02", "XLY": "#D94801", "XLI": "#7A7A7A",
-    "XLU": "#4D4D4D", "XLE": "#145A32", "XLB": "#A0522D",
-    "XLF": "#1B263B", "XLRE": "#8D6E63"
+    "XLK": "#1F4E79", "XLV": "#2E8B57", "XLC": "#6B4C9A",
+    "XLY": "#C05600", "XLP": "#B38F00", "XLI": "#6C757D",
+    "XLU": "#444444", "XLE": "#14532D", "XLB": "#8B5A2B",
+    "XLF": "#1B263B", "XLRE": "#8A7967"
 }
 FACTOR_COLORS = {
-    "MTUM": "#1F77B4", "QUAL": "#2CA02C", "VLUE": "#1B263B",
-    "SIZE": "#D94801", "USMV": "#4D4D4D", "HDV": "#E6AB02"
+    "MTUM": "#1F4E79", "VLUE": "#7A1F2B", "QUAL": "#1B6F6A",
+    "SIZE": "#C05600", "HDV": "#B38F00", "USMV": "#5A5A5A"
 }
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
