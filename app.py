@@ -30,6 +30,16 @@ CM = dict(b=120, t=60, l=60, r=40)
 LEG = dict(orientation="h", yanchor="top", y=-0.25, x=0.5, xanchor="center")
 PCFG = dict(displayModeBar=False, scrollZoom=False)
 
+DISCLAIMER = (
+    "*Disclaimer: This dashboard is for educational and informational purposes only. "
+    "Nothing contained herein constitutes investment advice, a recommendation, or a solicitation "
+    "to buy or sell any securities or financial instruments. The data presented may be delayed, "
+    "incomplete, or inaccurate, and should not be relied upon for trading or investment decisions. "
+    "Past performance is not indicative of future results. The authors and contributors assume no "
+    "liability for any losses or damages arising from the use of this information. "
+    "Consult a qualified financial advisor before making any investment decisions.*"
+)
+
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
@@ -150,16 +160,24 @@ KEY_RELEASES = [
 
 FOMC = {
     "2025": [
-        ("Jan 28–29", "2025-01-29"), ("Mar 18–19", "2025-03-19"),
-        ("May 6–7",   "2025-05-07"), ("Jun 17–18", "2025-06-18"),
-        ("Jul 29–30", "2025-07-30"), ("Sep 16–17", "2025-09-17"),
-        ("Oct 28–29", "2025-10-29"), ("Dec 9–10",  "2025-12-10"),
+        ("Jan 28–29", "2025-01-29", "Hold (4.25–4.50%)"),
+        ("Mar 18–19", "2025-03-19", "Hold (4.25–4.50%)"),
+        ("May 6–7",   "2025-05-07", "Hold (4.25–4.50%)"),
+        ("Jun 17–18", "2025-06-18", "Hold (4.25–4.50%)"),
+        ("Jul 29–30", "2025-07-30", "Hold (4.25–4.50%)"),
+        ("Sep 16–17", "2025-09-17", "Cut −25bp (4.00–4.25%)"),
+        ("Oct 28–29", "2025-10-29", "Cut −25bp (3.75–4.00%)"),
+        ("Dec 9–10",  "2025-12-10", "Cut −25bp (3.50–3.75%)"),
     ],
     "2026": [
-        ("Jan 27–28", "2026-01-28"), ("Mar 17–18", "2026-03-18"),
-        ("Apr 28–29", "2026-04-29"), ("Jun 9–10",  "2026-06-10"),
-        ("Jul 28–29", "2026-07-29"), ("Sep 15–16", "2026-09-16"),
-        ("Oct 27–28", "2026-10-28"), ("Dec 8–9",   "2026-12-09"),
+        ("Jan 27–28", "2026-01-28", "Hold (3.50–3.75%)"),
+        ("Mar 17–18", "2026-03-18", ""),
+        ("Apr 28–29", "2026-04-29", ""),
+        ("Jun 9–10",  "2026-06-10", ""),
+        ("Jul 28–29", "2026-07-29", ""),
+        ("Sep 15–16", "2026-09-16", ""),
+        ("Oct 27–28", "2026-10-28", ""),
+        ("Dec 8–9",   "2026-12-09", ""),
     ]
 }
 
@@ -418,7 +436,8 @@ def build_holdings_attribution(etf_ticker, prices):
         })
     df = pd.DataFrame(rows)
     if not df.empty:
-        df = df.sort_values("Contribution", key=abs, ascending=False).reset_index(drop=True)
+        df["_abs_contrib"] = df["Contribution"].abs()
+        df = df.sort_values("_abs_contrib", ascending=False).drop(columns=["_abs_contrib"]).reset_index(drop=True)
     return df, etf_ret, is_live
 
 def build_positioning_table(prices, volumes, asset_dict, ret_days):
@@ -652,6 +671,7 @@ with tab1:
                 return s
             st.dataframe(_style_topbot(df_display),
                          hide_index=True, use_container_width=True, height=248)
+            st.caption("Source: FRED · Yahoo Finance")
 
     st.divider()
 
@@ -696,7 +716,7 @@ with tab1:
                     template="plotly_white", height=280,
                     yaxis_title="%-tile", yaxis=dict(range=[0, 1], dtick=0.25),
                     margin=dict(b=45, t=65, l=45, r=25),
-                    dragmode=False)
+                    dragmode=False, annotations=[src_ann(-0.12)])
                 st.plotly_chart(fig_rr, use_container_width=True,
                                 key="fig_rotation", config=PCFG)
             else:
@@ -727,7 +747,7 @@ with tab1:
                         font=dict(size=12)),
                     template="plotly_white", height=280, yaxis_title="Indexed",
                     margin=dict(b=45, t=65, l=45, r=25),
-                    dragmode=False)
+                    dragmode=False, annotations=[src_ann(-0.12)])
                 st.plotly_chart(fig_br, use_container_width=True,
                                 key="fig_breadth", config=PCFG)
         except Exception:
@@ -791,7 +811,7 @@ with tab1:
                 template="plotly_white", height=280, yaxis_title="Z-Score",
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
                 margin=dict(b=45, t=65, l=45, r=25),
-                bargap=0.15, dragmode=False)
+                bargap=0.15, dragmode=False, annotations=[src_ann(-0.12)])
             st.plotly_chart(fig_sv, use_container_width=True,
                             key="fig_spy_vol", config=PCFG)
         except Exception:
@@ -927,7 +947,7 @@ with tab1:
     st.subheader("Sector ETF Holdings & Daily Attribution")
     st.caption(
         "Expand any sector to see top holdings, weight, daily return, "
-        "and contribution (weight × return). Sorted by |contribution|. "
+        "and contribution (weight × return). Sorted by contribution. "
         "Weights are hardcoded and updated biannually — minor drift expected between updates.")
 
     exp_cols = st.columns(2)
@@ -954,9 +974,14 @@ with tab1:
                         st.info("Holdings data unavailable.")
                 except Exception:
                     st.info("Holdings data unavailable.")
+    st.caption("Source: Yahoo Finance · Weights approximate")
+
+    st.divider()
+    st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>',
+                unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — RATES & MACRO
+# TAB 2 — FIXED INCOME & MACRO
 # ══════════════════════════════════════════════════════════════════════════════
 with tab2:
     # ── Header: Key rate indicators ──
@@ -979,6 +1004,7 @@ with tab2:
         except Exception:
             col.metric(label, "N/A")
 
+    st.caption("Source: FRED")
     st.divider()
 
     rp = st.radio("Period", ["1Y", "3Y", "5Y", "10Y", "Full"],
@@ -1145,6 +1171,10 @@ with tab2:
         except Exception:
             st.info("GDP data unavailable.")
 
+    st.divider()
+    st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>',
+                unsafe_allow_html=True)
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 3 — CALENDAR
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1153,7 +1183,7 @@ with tab3:
 
     with col_left:
         st.subheader("Upcoming Releases")
-        st.caption("Next 45 days and past 35 days — all via FRED")
+        st.caption("FRED releases — next 45 days and past 35 days")
         with st.spinner("Loading…"):
             snap = fetch_release_snapshot()
             if not snap.empty:
@@ -1161,10 +1191,11 @@ with tab3:
                     snap.style.apply(snap_color, axis=1)
                         .format({"Previous": safe_fmt, "Latest": safe_fmt}, na_rep="—"),
                     hide_index=True, use_container_width=True, height=420)
+                st.caption("Source: FRED")
 
         st.divider()
         st.subheader("Release Calendar")
-        st.caption("All FRED releases — past 35 days and next 45 days "
+        st.caption("FRED release schedule — past 35 days and next 45 days "
                    "· yellow = today · gray = past")
         with st.spinner("Loading calendar…"):
             cal = fetch_fred_calendar()
@@ -1184,13 +1215,14 @@ with tab3:
                 st.dataframe(
                     disp_cal.style.apply(cal_style, axis=1),
                     hide_index=True, use_container_width=True, height=520)
+                st.caption("Source: FRED")
 
     with col_right:
         st.subheader("FOMC Dates")
         today_d = datetime.today().date()
         for year, meetings in FOMC.items():
             st.caption(f"**{year}**")
-            for lbl, d in meetings:
+            for lbl, d, result in meetings:
                 mtg_d = datetime.strptime(d, "%Y-%m-%d").date()
                 days = (mtg_d - today_d).days
                 if days > 0:
@@ -1198,7 +1230,8 @@ with tab3:
                 elif days == 0:
                     st.markdown(f"🟡 **{lbl}** — *today*")
                 else:
-                    st.markdown(f"✅ ~~{lbl}~~")
+                    note = f" · {result}" if result else ""
+                    st.markdown(f"✅ ~~{lbl}~~{note}")
         st.divider()
         st.caption("**Current Fed Funds Rate**")
         try:
@@ -1206,3 +1239,7 @@ with tab3:
             st.metric("Fed Funds", f"{ff.iloc[-1]:.2f}%")
         except Exception:
             st.metric("Fed Funds", "N/A")
+
+    st.divider()
+    st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>',
+                unsafe_allow_html=True)
