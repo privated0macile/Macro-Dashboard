@@ -907,11 +907,11 @@ with tab1:
         p_idx, fz = p_idx.loc[common], fz.loc[common]
         if len(common) < 5:
             return None
-        bar_colors = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
+        bar_colors = "rgba(180,180,180,0.4)"
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         fig.add_trace(
             go.Bar(x=fz.index, y=fz.values, name="Flow Z",
-                   marker_color=bar_colors, opacity=0.35), secondary_y=True)
+                   marker_color=bar_colors, showlegend=False), secondary_y=True)
         fig.add_trace(
             go.Scatter(x=p_idx.index, y=p_idx.values, name=label,
                        mode="lines", line=dict(color="#1f77b4", width=2.5)),
