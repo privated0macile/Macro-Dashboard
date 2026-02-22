@@ -360,7 +360,7 @@ with tab1:
     period_opts = {"Past 12M": None, "Since 2015": "2015-01-01", "Since 2020": "2020-01-01", "Since 2025": "2025-01-01"}
 
     # ── Header: Indices + Top/Bottom table ──
-    hdr_l, hdr_r = st.columns([3, 2])
+    hdr_l, hdr_r = st.columns(2)
     with hdr_l:
         idx_period = st.radio("Period", ["1M","3M","6M","YTD","1Y"], horizontal=True, key="idx_period")
         latest = prices.index.max()
@@ -380,18 +380,42 @@ with tab1:
             template="plotly_white", height=260, yaxis_title="Return (%)",
             margin=dict(b=70,t=50,l=55,r=40), legend=dict(orientation="h",yanchor="top",y=-0.28,x=0.5,xanchor="center"),
             dragmode=False)
-        add_src(fig_idx, -0.28)
+        add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key="fig_idx", config=PCFG)
 
     with hdr_r:
-        pos_freq = st.radio("Return period", ["1D","5D","1M","12M"], horizontal=True, key="pos_freq")
-        rd = {"1D":1,"5D":5,"1M":21,"12M":252}[pos_freq]
-        df_sec = build_positioning_table(prices, volumes, SECTORS, rd)
-        if not df_sec.empty and "Composite" in df_sec.columns:
-            dr = df_sec.dropna(subset=["Composite"]).sort_values("Composite", ascending=False).reset_index(drop=True)
-            t3, b3 = dr.head(3), dr.tail(3)
-            dd = pd.concat([t3, b3], ignore_index=True).rename(columns={"Return %": f"{pos_freq} Ret %"})
-            st.markdown(f"**Top 3 / Bottom 3 by Composite** -- {pos_freq} return")
+        # Build multi-period positioning for sectors
+        rows = []
+        for t, n in SECTORS.items():
+            try:
+                p = prices[t].dropna()
+                if len(p) < 2: continue
+                r1 = p.pct_change().iloc[-1]*100
+                r5 = ((p.iloc[-1]/p.iloc[-5])-1)*100 if len(p) >= 5 else np.nan
+                r1m = ((p.iloc[-1]/p.iloc[-21])-1)*100 if len(p) >= 21 else np.nan
+                r12m = ((p.iloc[-1]/p.iloc[-252])-1)*100 if len(p) >= 252 else np.nan
+                fz = compute_flow_proxy_z(prices, volumes, t)
+                fzv = round(fz.iloc[-1],2) if len(fz) > 0 else np.nan
+                svz = compute_signed_volume_z(prices, volumes, t)
+                svzv = round(svz.iloc[-1],2) if len(svz) > 0 else np.nan
+                rs = p.pct_change()
+                rm = rs.rolling(ZSCORE_LOOKBACK, min_periods=60).mean()
+                rsd = rs.rolling(ZSCORE_LOOKBACK, min_periods=60).std()
+                rzv = float(np.clip((rs.iloc[-1]-rm.iloc[-1])/rsd.iloc[-1],-3,3))
+                comp = [v for v in [fzv, svzv, rzv] if not np.isnan(v)]
+                cv = round(np.mean(comp),2) if comp else np.nan
+                rows.append({"Ticker":t,"Name":n,
+                    "1D":round(r1,2),"5D":round(r5,2) if not np.isnan(r5) else np.nan,
+                    "1M":round(r1m,2) if not np.isnan(r1m) else np.nan,
+                    "12M":round(r12m,2) if not np.isnan(r12m) else np.nan,
+                    "Flow Z":fzv,"Composite":cv})
+            except Exception: continue
+        df_pos = pd.DataFrame(rows)
+        if not df_pos.empty and "Composite" in df_pos.columns:
+            df_pos = df_pos.dropna(subset=["Composite"]).sort_values("Composite", ascending=False).reset_index(drop=True)
+            t3, b3 = df_pos.head(3), df_pos.tail(3)
+            dd = pd.concat([t3, b3], ignore_index=True)
+            st.markdown("**Top 3 / Bottom 3 by Composite**")
             def _sty(d):
                 def cz(v):
                     if pd.isna(v): return ""
@@ -404,13 +428,13 @@ with tab1:
                     if pd.isna(v): return ""
                     return "color:#2ca02c" if v > 0 else "color:#d62728" if v < 0 else ""
                 s = d.style
-                for c in ["Flow Z","Signed Vol Z","Composite"]:
+                for c in ["Flow Z","Composite"]:
                     if c in d.columns: s = s.map(cz, subset=[c])
-                rc = f"{pos_freq} Ret %"
-                if rc in d.columns: s = s.map(cr2, subset=[rc])
-                fmt = {c: "{:+.2f}" for c in [rc,"Flow Z","Signed Vol Z","Composite"] if c in d.columns}
+                for c in ["1D","5D","1M","12M"]:
+                    if c in d.columns: s = s.map(cr2, subset=[c])
+                fmt = {c: "{:+.2f}" for c in ["1D","5D","1M","12M","Flow Z","Composite"] if c in d.columns}
                 return s.format(fmt, na_rep="---")
-            st.dataframe(_sty(dd), hide_index=True, use_container_width=True, height=230)
+            st.dataframe(_sty(dd), hide_index=True, use_container_width=True, height=260)
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
