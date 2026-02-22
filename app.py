@@ -45,13 +45,16 @@ FACTORS = {"MTUM": "Momentum", "QUAL": "Quality", "SIZE": "Size", "VLUE": "Value
 SECTORS = {
     "XLK": "Technology", "XLF": "Financials", "XLE": "Energy",
     "XLV": "Healthcare", "XLI": "Industrials", "XLY": "Cons. Disc.",
-    "XLP": "Cons. Staples", "XLB": "Materials", "XLU": "Utilities", "XLRE": "Real Estate"
+    "XLP": "Cons. Staples", "XLB": "Materials", "XLU": "Utilities",
+    "XLRE": "Real Estate", "XLC": "Comm. Services"
 }
-SECTORS_CYCLICAL = {"XLK": "Technology", "XLF": "Financials", "XLE": "Energy", "XLI": "Industrials", "XLY": "Cons. Disc.", "XLB": "Materials"}
-SECTORS_DEFENSIVE = {"XLV": "Healthcare", "XLP": "Cons. Staples", "XLU": "Utilities", "XLRE": "Real Estate"}
+SECTORS_CYCLICAL = {"XLE": "Energy", "XLB": "Materials", "XLI": "Industrials",
+    "XLY": "Cons. Disc.", "XLF": "Financials", "XLK": "Technology", "XLC": "Comm. Services"}
+SECTORS_DEFENSIVE = {"XLP": "Cons. Staples", "XLV": "Healthcare",
+    "XLU": "Utilities", "XLRE": "Real Estate"}
 INDICES = {"SPY": "S&P 500", "QQQ": "Nasdaq 100", "IWM": "Russell 2000", "DIA": "Dow 30"}
 INDICES_CHART = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "^RUT": "Russell 2000", "^DJI": "Dow 30"}
-EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE"}
+EW_SECTORS = {"XLK": "RYT", "XLF": "RYF", "XLE": "RYE", "XLV": "RYH", "XLI": "RGI", "XLY": "RCD", "XLP": "RHS", "XLB": "RTM", "XLU": "RYU", "XLRE": "EWRE", "XLC": "EWCO"}
 RETAIL_ETFS = ["TQQQ", "SQQQ"]
 
 HOLDINGS = {
@@ -65,6 +68,7 @@ HOLDINGS = {
     "XLB": [("LIN","Linde",0.19),("SHW","Sherwin-Williams",0.09),("FCX","Freeport-McMoRan",0.08),("APD","Air Products",0.06),("ECL","Ecolab",0.06),("NEM","Newmont",0.05),("NUE","Nucor",0.04),("DOW","Dow Inc",0.04)],
     "XLU": [("NEE","NextEra",0.15),("SO","Southern Co",0.10),("DUK","Duke Energy",0.08),("CEG","Constellation",0.07),("SRE","Sempra",0.05),("AEP","AEP",0.05),("D","Dominion",0.04),("PCG","PG&E",0.04)],
     "XLRE": [("PLD","Prologis",0.13),("AMT","American Tower",0.10),("EQIX","Equinix",0.09),("WELL","Welltower",0.07),("SPG","Simon Property",0.06),("DLR","Digital Realty",0.05),("PSA","Public Storage",0.05),("O","Realty Income",0.05)],
+    "XLC": [("META","Meta",0.23),("GOOGL","Alphabet A",0.12),("GOOG","Alphabet C",0.11),("NFLX","Netflix",0.08),("T","AT&T",0.05),("CMCSA","Comcast",0.05),("DIS","Disney",0.04),("TMUS","T-Mobile",0.04)],
 }
 
 def get_holdings(etf):
@@ -428,7 +432,11 @@ with tab1:
                 def cr2(v):
                     if pd.isna(v): return ""
                     return "color:#2ca02c" if v > 0 else "color:#d62728" if v < 0 else ""
-                s = d.style
+                def row_border(row):
+                    if row.name == 2:
+                        return ["border-bottom:2px solid #333"]*len(row)
+                    return [""]*len(row)
+                s = d.style.apply(row_border, axis=1)
                 for c in ["Flow Z","Composite"]:
                     if c in d.columns: s = s.map(cz, subset=[c])
                 for c in ["1D","5D","1M","12M"]:
