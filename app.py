@@ -63,7 +63,7 @@ SECTOR_COLORS = {
     "XLI": "#A3A9B0",   # light steel - Industrials
     "XLU": "#5EC4D4",   # light teal - Utilities
     "XLE": "#4AA06D",   # medium green - Energy
-    "XLF": "#C62828",   # cherry red - Financials
+    "XLF": "#D94F5C",   # pastel cherry - Financials
     "XLB": "#C08B5C",   # tan - Materials
     "XLRE": "#D97BA0",  # soft rose - Real Estate
 }
