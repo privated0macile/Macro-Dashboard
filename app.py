@@ -723,10 +723,10 @@ with tab1:
                         f"<span style='font-size:11px;color:#666'>"
                         f">0.75 sector-driven · <0.25 stock-driven</span>"),
                         font=dict(size=12)),
-                    template="plotly_white", height=300,
+                    template="plotly_white", height=320,
                     yaxis_title="%-tile", yaxis=dict(range=[0, 1], dtick=0.25),
-                    margin=dict(b=55, t=65, l=45, r=25),
-                    dragmode=False, annotations=[src_ann(-0.18)])
+                    margin=dict(b=70, t=65, l=45, r=25),
+                    dragmode=False, annotations=[src_ann(-0.25)])
                 st.plotly_chart(fig_rr, use_container_width=True,
                                 key="fig_rotation", config=PCFG)
             else:
@@ -755,9 +755,9 @@ with tab1:
                         f"<span style='font-size:11px;color:#666'>"
                         f"RSP/SPY · rising = broadening</span>"),
                         font=dict(size=12)),
-                    template="plotly_white", height=300, yaxis_title="Indexed",
-                    margin=dict(b=55, t=65, l=45, r=25),
-                    dragmode=False, annotations=[src_ann(-0.18)])
+                    template="plotly_white", height=320, yaxis_title="Indexed",
+                    margin=dict(b=70, t=65, l=45, r=25),
+                    dragmode=False, annotations=[src_ann(-0.25)])
                 st.plotly_chart(fig_br, use_container_width=True,
                                 key="fig_breadth", config=PCFG)
         except Exception:
@@ -818,10 +818,10 @@ with tab1:
                     f"<span style='font-size:11px;color:#666'>"
                     f"0 = 1Y median · 3M window · ±3</span>"),
                     font=dict(size=12)),
-                template="plotly_white", height=300, yaxis_title="Z-Score",
+                template="plotly_white", height=320, yaxis_title="Z-Score",
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
-                margin=dict(b=55, t=65, l=45, r=25),
-                bargap=0.15, dragmode=False, annotations=[src_ann(-0.18)])
+                margin=dict(b=70, t=65, l=45, r=25),
+                bargap=0.15, dragmode=False, annotations=[src_ann(-0.25)])
             st.plotly_chart(fig_sv, use_container_width=True,
                             key="fig_spy_vol", config=PCFG)
         except Exception:
