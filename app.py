@@ -63,15 +63,15 @@ SECTOR_COLORS = {
     "XLI": "#A3A9B0",   # light steel - Industrials
     "XLU": "#5EC4D4",   # light teal - Utilities
     "XLE": "#4AA06D",   # medium green - Energy
-    "XLF": "#4A6FA5",   # medium blue - Financials
+    "XLF": "#E8725C",   # salmon red - Financials
     "XLB": "#C08B5C",   # tan - Materials
     "XLRE": "#D97BA0",  # soft rose - Real Estate
 }
 FACTOR_COLORS = {
     "MTUM": "#5B9BD5",  # soft blue - Momentum
-    "VLUE": "#4A6FA5",  # medium blue - Value
+    "VLUE": "#E8725C",  # salmon red - Value
     "QUAL": "#70C27A",  # soft green - Quality
-    "SIZE": "#E8955A",  # peach orange - Size
+    "SIZE": "#F0A050",  # warm orange - Size
     "USMV": "#A3A9B0",  # light steel - Min Vol
     "HDV": "#D4AA4F",   # warm gold - Yield
 }
