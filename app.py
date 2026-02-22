@@ -69,7 +69,7 @@ SECTOR_COLORS = {
 }
 FACTOR_COLORS = {
     "MTUM": "#5B9BD5",  # soft blue - Momentum
-    "VLUE": "#C62828",  # cherry red - Value
+    "VLUE": "#D94F5C",  # pastel cherry - Value
     "QUAL": "#70C27A",  # soft green - Quality
     "SIZE": "#F0A050",  # warm orange - Size
     "USMV": "#A3A9B0",  # light steel - Min Vol
