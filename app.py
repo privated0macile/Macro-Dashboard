@@ -554,7 +554,9 @@ with tab1:
         if len(cm) < 5: return None
         bc = ["#2ca02c" if v >= 0 else "#d62728" for v in fz.values]
         fig = make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_trace(go.Bar(x=fz.index, y=fz.values, name="Flow Z", marker_color=bc, opacity=0.35), secondary_y=True)
+        fig.add_trace(go.Bar(x=fz.index, y=fz.values, name="Flow Z", marker_color=bc, opacity=0.35, showlegend=False), secondary_y=True)
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="Accumulation", marker=dict(size=8, color="#2ca02c", symbol="square")))
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="markers", name="Distribution", marker=dict(size=8, color="#d62728", symbol="square")))
         fig.add_trace(go.Scatter(x=pi.index, y=pi.values, name=lbl, mode="lines", line=dict(color="#1f77b4",width=2.5)), secondary_y=False)
         fig.add_hline(y=1.0, line_dash="dash", line_color="gray", line_width=0.8, secondary_y=False)
         fig.update_layout(title=dict(text=f"<b>{lbl}</b> ({t})<br><span style='font-size:11px;color:#666'>Price indexed / Flow z (252d) / green = accumulation</span>", font=dict(size=13)),
