@@ -117,30 +117,8 @@ HOLDINGS = {
     ],
 }
 
-@st.cache_data(ttl=86400)
-def fetch_live_holdings(etf_ticker, top_n=10):
-    try:
-        t = yf.Ticker(etf_ticker)
-        if not hasattr(t, 'funds_data') or t.funds_data is None:
-            return None
-        df = t.funds_data.top_holdings
-        if df is None or df.empty:
-            return None
-        result = []
-        for idx_val in df.index[:top_n]:
-            tkr = str(idx_val).strip()
-            wt = float(df.iloc[df.index.get_loc(idx_val), 0])
-            if wt > 1:
-                wt = wt / 100.0
-            result.append((tkr, tkr, round(wt, 4)))
-        return result if len(result) >= 3 else None
-    except Exception:
-        return None
-
 def get_holdings(etf_ticker):
-    live = fetch_live_holdings(etf_ticker)
-    if live:
-        return live, True
+    """Return hardcoded holdings."""
     return HOLDINGS.get(etf_ticker, []), False
 
 SECTORS_CYCLICAL = {
@@ -612,7 +590,15 @@ with tab1:
                     fig_idx.add_trace(go.Scatter(
                         x=indexed.index, y=indexed.values,
                         name=name, mode="lines",
-                        line=dict(color=idx_colors.get(tkr, "#999"), width=2.5)))
+                        line=dict(color=idx_colors.get(tkr, "#999"), width=2.5),
+                        customdata=s.values,
+                        hovertemplate=(
+                            f"<b>{name}</b><br>"
+                            "Date: %{x|%b %d, %Y}<br>"
+                            "Return: %{y:+.2f}%<br>"
+                            "Price: $%{customdata:,.2f}"
+                            "<extra></extra>"
+                        )))
         fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_idx.update_layout(
             title=chart_title("Index Returns", f"{idx_period} cumulative % return"),
@@ -708,7 +694,7 @@ with tab1:
                         f">0.75 sector-driven · <0.25 stock-driven</span>"),
                         font=dict(size=12)),
                     template="plotly_white", height=280,
-                    yaxis_title="%-tile", yaxis=dict(range=[0, 1]),
+                    yaxis_title="%-tile", yaxis=dict(range=[0, 1], dtick=0.25),
                     margin=dict(b=45, t=65, l=45, r=25),
                     dragmode=False)
                 st.plotly_chart(fig_rr, use_container_width=True,
@@ -941,7 +927,8 @@ with tab1:
     st.subheader("Sector ETF Holdings & Daily Attribution")
     st.caption(
         "Expand any sector to see top holdings, weight, daily return, "
-        "and contribution (weight × return). Sorted by |contribution|.")
+        "and contribution (weight × return). Sorted by |contribution|. "
+        "Weights are hardcoded and updated biannually — minor drift expected between updates.")
 
     exp_cols = st.columns(2)
     for i, (tkr, name) in enumerate(SECTORS.items()):
