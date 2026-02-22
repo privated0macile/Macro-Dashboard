@@ -8,7 +8,7 @@ import requests
 from datetime import datetime, timedelta
 import fredapi
 
-st.set_page_config(page_title="Macro Dashboard", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Macro Dashboard", layout="wide", page_icon="📊", initial_sidebar_state="collapsed")
 st.markdown("""
 <style>
     [data-testid="stMetricValue"] { font-size: 1.1rem; }
@@ -63,13 +63,13 @@ SECTOR_COLORS = {
     "XLI": "#A3A9B0",   # light steel - Industrials
     "XLU": "#5EC4D4",   # light teal - Utilities
     "XLE": "#4AA06D",   # medium green - Energy
-    "XLF": "#E8725C",   # salmon red - Financials
+    "XLF": "#C62828",   # cherry red - Financials
     "XLB": "#C08B5C",   # tan - Materials
     "XLRE": "#D97BA0",  # soft rose - Real Estate
 }
 FACTOR_COLORS = {
     "MTUM": "#5B9BD5",  # soft blue - Momentum
-    "VLUE": "#E8725C",  # salmon red - Value
+    "VLUE": "#C62828",  # cherry red - Value
     "QUAL": "#70C27A",  # soft green - Quality
     "SIZE": "#F0A050",  # warm orange - Size
     "USMV": "#A3A9B0",  # light steel - Min Vol
