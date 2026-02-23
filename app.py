@@ -406,9 +406,9 @@ with tab1:
                         hovertemplate=f"<b>{n}</b><br>Date: %{{x|%b %d, %Y}}<br>Return: %{{y:+.2f}}%<br>Level: %{{customdata:,.2f}}<extra></extra>"))
         fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_idx.update_layout(title=chart_title("U.S. Major Indices", f"{idx_period} cumulative return"),
-            template="plotly_white", height=260, yaxis_title="Return (%)",
-            margin=dict(b=70,t=50,l=55,r=40), legend=dict(orientation="h",yanchor="top",y=-0.28,x=0.5,xanchor="center"),
-            dragmode=False)
+            template="plotly_white", height=220, yaxis_title="Return (%)",
+            margin=dict(b=60,t=40,l=50,r=30), legend=dict(orientation="h",yanchor="top",y=-0.35,x=0.5,xanchor="center",font=dict(size=9)),
+            dragmode=False, font=dict(size=10))
         add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key="fig_idx", config=PCFG)
 
