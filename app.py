@@ -23,7 +23,7 @@ START = "2015-01-01"
 BENCH = "SPY"
 ROLL = 126
 CM = dict(b=120, t=60, l=60, r=40)
-LEG = dict(orientation="h", yanchor="top", y=-0.25, x=0.5, xanchor="center")
+LEG = dict(orientation="h", yanchor="top", y=-0.25, x=0.5, xanchor="center", font=dict(size=11))
 PCFG = dict(displayModeBar=False, scrollZoom=False)
 
 DISCLAIMER = (
@@ -147,6 +147,12 @@ def fetch_equity():
         return raw["Close"], raw["Volume"]
 
 @st.cache_data(ttl=3600)
+def fetch_benchmark_ohlc(start=START, ticker=BENCH):
+    raw = yf.download(ticker, start=start, auto_adjust=True, progress=False, threads=True)
+    raw.index = pd.to_datetime(raw.index)
+    return raw[["Open","High","Low","Close","Volume"]].dropna()
+
+@st.cache_data(ttl=3600)
 def fetch_release_snapshot():
     rows = []
     for name, sid, unit, calc in KEY_RELEASES:
@@ -210,6 +216,25 @@ def reindex_from(df, bd):
 def src_ann(y=-0.30):
     return dict(text="Source: FRED / Yahoo Finance", xref="paper", yref="paper",
                 x=1.0, y=y, showarrow=False, font=dict(size=10, color="#888888"), xanchor="right")
+
+def get_negative_spread_ranges(s):
+    periods = []
+    inv = (s < 0).astype(int)
+    in_neg = False
+    start = None
+    prev = None
+    for dt, val in inv.items():
+        if val == 1 and not in_neg:
+            in_neg = True
+            start = dt
+        elif val == 0 and in_neg:
+            periods.append((start, prev))
+            in_neg = False
+        prev = dt
+    if in_neg and start is not None:
+        periods.append((start, prev))
+    return periods
+
 
 def chart_title(m, s): return f"{m} {s}"
 
@@ -377,6 +402,13 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+st.markdown(f"""
+<div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
+  <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and is refreshed hourly from cached calls.</p>
+  <p style="margin:0;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Every chart includes a short caption describing what it shows, why it matters, and the data source.</p>
+</div>
+""", unsafe_allow_html=True)
+
 tab1, tab2, tab3 = st.tabs(["Equities", "Fixed Income & Macro", "Calendar"])
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -407,8 +439,8 @@ with tab1:
         fig_idx.add_hline(y=0, line_dash="dash", line_color="gray", line_width=1)
         fig_idx.update_layout(title=chart_title("U.S. Major Indices", f"{idx_period} cumulative return"),
             template="plotly_white", height=220, yaxis_title="Return (%)",
-            margin=dict(b=60,t=40,l=50,r=30), legend=dict(orientation="h",yanchor="top",y=-0.35,x=0.5,xanchor="center",font=dict(size=9)),
-            dragmode=False, font=dict(size=10))
+            margin=dict(b=60,t=40,l=50,r=30), legend=dict(orientation="h",yanchor="top",y=-0.35,x=0.5,xanchor="center",font=dict(size=11)),
+            dragmode=False, font=dict(size=11))
         add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key="fig_idx", config=PCFG)
 
@@ -472,6 +504,49 @@ with tab1:
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
+
+    st.subheader("Benchmark Price Action")
+    st.caption("Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.")
+    spy_window = st.selectbox("SPY candlestick window", ["3M","6M","1Y","Since 2015"], key="spy_window", index=1)
+    spy_start = {
+        "3M": prices.index.max() - pd.DateOffset(months=3),
+        "6M": prices.index.max() - pd.DateOffset(months=6),
+        "1Y": prices.index.max() - pd.DateOffset(years=1),
+        "Since 2015": pd.Timestamp(START),
+    }[spy_window]
+    spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime("%Y-%m-%d"))
+    if not spy_ohlc.empty:
+        fig_spy = go.Figure()
+        fig_spy.add_trace(go.Candlestick(
+            x=spy_ohlc.index,
+            open=spy_ohlc["Open"],
+            high=spy_ohlc["High"],
+            low=spy_ohlc["Low"],
+            close=spy_ohlc["Close"],
+            increasing_line_color="#2ca02c",
+            decreasing_line_color="#d62728",
+            name=BENCH
+        ))
+        fig_spy.add_trace(go.Scatter(
+            x=spy_ohlc.index,
+            y=spy_ohlc["Close"].rolling(20).mean(),
+            mode="lines",
+            line=dict(color="#1f77b4", width=1.8),
+            name="20D MA"
+        ))
+        fig_spy.update_layout(
+            title=chart_title("SPY Candlestick","Price action with 20-day moving average"),
+            template="plotly_white",
+            height=420,
+            margin=dict(b=70,t=60,l=60,r=40),
+            legend=LEG,
+            dragmode=False
+        )
+        fig_spy.update_yaxes(title_text="Price ($)")
+        add_src(fig_spy, -0.18)
+        st.plotly_chart(fig_spy, use_container_width=True, key="fig_spy_candle", config=PCFG)
+    else:
+        st.info("SPY candlestick data unavailable.")
 
     # ── Daily Positioning Feed ──
     st.subheader("Daily Positioning Feed")
@@ -626,7 +701,7 @@ with tab1:
         fig.add_hline(y=0, line_dash="dash", line_color="gray", line_width=0.8, secondary_y=False)
         fig.update_layout(title=dict(text=f"<b>{lbl}</b> ({t})<br><span style='font-size:11px;color:#666'>Return % / Flow z (252d) / green = accumulation</span>", font=dict(size=13)),
             template="plotly_white", height=320, margin=dict(b=55,t=65,l=50,r=40),
-            legend=dict(orientation="h",yanchor="top",y=-0.18,x=0.5,xanchor="center",font=dict(size=9)),
+            legend=dict(orientation="h",yanchor="top",y=-0.18,x=0.5,xanchor="center",font=dict(size=11)),
             dragmode=False, bargap=0.1)
         fig.update_yaxes(title_text="Return %", secondary_y=False)
         fig.update_yaxes(title_text="Flow Z", secondary_y=True, range=[-3.5,3.5], dtick=1, showgrid=False)
@@ -719,7 +794,14 @@ with tab2:
             try: s = trim(fetch_fred(sid), rmons); fig.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode="lines"))
             except Exception: pass
         fig.add_hline(y=0, line_dash="dash", line_color="red", line_width=1)
-        fig.update_layout(title=chart_title("Curve Spreads","Below 0 = inverted"), template="plotly_white", height=340,
+        try:
+            spread = trim(fetch_fred("T10Y2Y"), rmons)
+            inv_periods = get_negative_spread_ranges(spread)
+            for start, end in inv_periods:
+                fig.add_vrect(x0=start, x1=end, fillcolor="LightSalmon", opacity=0.12, line_width=0)
+        except Exception:
+            pass
+        fig.update_layout(title=chart_title("Curve Spreads","Below 0 = inverted / shaded = contiguous inversion"), template="plotly_white", height=340,
             yaxis_title="Spread (%)", margin=dict(b=90,t=50,l=55,r=30), legend=LEG, dragmode=False)
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key="fig_spreads", config=PCFG)
