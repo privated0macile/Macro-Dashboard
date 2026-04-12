@@ -501,6 +501,62 @@ def build_yield_curve():
     fig.update_layout(title=chart_title('Current Yield Curve', 'Spot rates 1M-30Y'), template='plotly_white', height=380, yaxis_title='Yield (%)', xaxis_title='Maturity', margin=dict(b=70, t=60, l=60, r=40), dragmode=False)
     add_src(fig, -0.18)
     return fig
+
+# Info/Help Content Dictionary
+HELP_CONTENT = {
+    'us_major_indices': 'Shows how the four major U.S. stock indices are performing — S&P 500 (large caps), Nasdaq 100 (tech-heavy), Russell 2000 (small caps), and Dow 30 (large-cap industrials). When these move together, the market is "bullish." When they diverge, it signals confusion or sector concentration.',
+    'sector_positioning': 'Each sector (Tech, Healthcare, Financials, etc.) gets a score based on three factors: money flowing in/out, unusual trading volume, and recent price momentum. Higher scores suggest strength; lower scores suggest weakness. The green and red colors quickly show which sectors are hot and cold.',
+    'daily_positioning': 'These four metrics tell the story of market breadth and behavior: Sector Rotation tracks if large-cap stocks or smaller stocks are leading. Breadth Ratio compares equal-weight vs. cap-weight SPY (narrow leadership = caution). Flow Z-Score measures unusual money movement. Vol Regime tracks if volatility is elevated.',
+    'benchmark_price_action': 'This candlestick chart shows the daily open, high, low, and close prices for SPY (S&P 500 ETF). The 20-day moving average (blue line) acts as a trend indicator. Green candles = price up, red candles = price down. Use this to spot support/resistance levels and recent trend direction.',
+    'relative_performance': 'Compares how each sector or factor has performed vs. SPY. A ratio above 1.0 = outperforming. A ratio below 1.0 = underperforming. The 126-day rolling alpha strips out the market effect to show whether a sector is truly beating or lagging on its own merits.',
+    'etf_flow_analysis': 'Monitors buying and selling activity (flow proxy) and price changes for a single ETF you select. Green = inflows + rising prices (strength). Red = outflows + falling prices (weakness). The z-scores highlight whether this activity is unusual or "normal."',
+    'sector_holdings': 'Breaks down the largest holdings (e.g., AAPL in Tech) and shows their daily performance. The "Contribution" column tells you which stocks are helping or hurting the sector ETF's return today. A large negative contribution means that stock is dragging down the sector.',
+    'top_bottom_composite': 'Identifies the strongest and weakest performers ranked by a composite score combining flow, volume, and momentum. The Composite score averages three z-scores (Flow Z-Score, Signed Volume Z-Score, Return Z-Score), all calculated over 252 trading days. A score of +2 or higher is very bullish; -2 or lower is very bearish.',
+    'yield_curve': 'Shows current U.S. Treasury yields across maturities (1 month to 30 years). When the curve is steep (long-term yields much higher than short-term), growth is expected. When flat or inverted, recession risk is rising. Higher yields = tighter monetary conditions.',
+    'yield_curve_trends': 'Tracks how the 10Y-2Y spread has moved over time. When it turns negative (inverted), it historically precedes recessions. When it steepens, it suggests economic recovery. The shaded regions highlight inversion periods.',
+    'credit_spreads': 'The gap between risky corporate bonds and safe U.S. Treasuries. Higher spreads = market is fearful. Lower spreads = market is confident. High-yield (junk bond) spreads are most sensitive to recession fears.',
+    'macro_releases': 'Displays the most recent economic data (Nonfarm Payrolls, Unemployment, CPI, etc.) and compares it to the previous release. Green = better than previous; Red = worse than previous. The "Next Release" column tells you when new data is coming.',
+    'fomc_calendar': 'Lists upcoming Federal Reserve decision dates and what the market expects. FOMC meetings occur 8 times per year. Policy changes at these meetings can move markets significantly.',
+}
+
+def show_info_icon(key, title=None):
+    """
+    Display an info icon (ⓘ) that opens a popover with help text.
+    
+    Args:
+        key: identifier in HELP_CONTENT dict (e.g., 'us_major_indices')
+        title: optional custom title for the popover (defaults to key name)
+    """
+    if key not in HELP_CONTENT:
+        return
+    
+    help_text = HELP_CONTENT[key]
+    unique_key = f"help_{key}_{id(st)}"
+    
+    col_icon, _ = st.columns([0.05, 0.95])
+    with col_icon:
+        if st.button('ⓘ', key=unique_key, help='Click for details'):
+            st.popover(f"ℹ️ {title or key.replace('_', ' ').title()}")
+            st.markdown(help_text)
+            st.divider()
+            st.caption("💡 Hover or click the ⓘ icon to see this again.")
+
+def show_info_inline(key, title=None):
+    """
+    Display an info icon on the same line as a header/title using columns.
+    Useful for headers that need an info icon next to them.
+    
+    Returns two columns: first for the icon, second for content after it.
+    """
+    col1, col2 = st.columns([0.08, 0.92])
+    with col1:
+        if key in HELP_CONTENT:
+            help_text = HELP_CONTENT[key]
+            unique_key = f"help_inline_{key}_{id(st)}"
+            if st.button('ⓘ', key=unique_key, help=help_text, use_container_width=True):
+                st.popover(f"ℹ️ {title or key.replace('_', ' ').title()}")
+                st.markdown(help_text)
+    return col2
 st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-items:baseline">\n    <h1 style="margin:0">Macro Dashboard</h1>\n    <span style="color:#888;font-size:0.85rem">\n        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}\n        &nbsp;/&nbsp; Data: FRED / Yahoo Finance\n    </span>\n</div>\n""", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
@@ -680,6 +736,16 @@ with tab1:
     with st.spinner('Loading equity data...'):
         prices, volumes = fetch_equity()
     period_opts = {'Past 12M': None, 'Since 2015': '2015-01-01', 'Since 2020': '2020-01-01', 'Since 2025': '2025-01-01'}
+    
+    # U.S. Major Indices Section with Info Icon
+    col_title, col_info = st.columns([0.9, 0.1])
+    with col_title:
+        st.subheader("U.S. Major Indices")
+    with col_info:
+        if st.button('ⓘ', key='help_us_major_indices', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ U.S. Major Indices")
+            st.markdown(HELP_CONTENT['us_major_indices'])
+    
     hdr_l, hdr_r = st.columns(2)
     with hdr_l:
         idx_period = st.radio('Period', ['1M', '3M', '6M', 'YTD', '1Y'], horizontal=True, key='idx_period')
@@ -699,6 +765,15 @@ with tab1:
         add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
     with hdr_r:
+        # Sector Positioning with Info Icon
+        col_sect_title, col_sect_info = st.columns([0.85, 0.15])
+        with col_sect_title:
+            st.subheader("Sector Positioning")
+        with col_sect_info:
+            if st.button('ⓘ', key='help_sector_positioning', help='Click for details', use_container_width=True):
+                st.popover("ℹ️ Sector Positioning")
+                st.markdown(HELP_CONTENT['sector_positioning'])
+        
         rows = []
         for t, n in SECTORS.items():
             try:
@@ -760,7 +835,14 @@ with tab1:
                 fmt = {c: '{:+.2f}' for c in ['1D', '5D', '1M', '12M', 'Flow Z', 'Composite'] if c in d.columns}
                 return s.format(fmt, na_rep='---')
             
-            st.markdown('**Top 3 by Composite**')
+            col_top_title, col_top_info = st.columns([0.85, 0.15])
+            with col_top_title:
+                st.markdown('**Top 3 by Composite**')
+            with col_top_info:
+                if st.button('ⓘ', key='help_top_bottom_composite', help='Click for details', use_container_width=True):
+                    st.popover("ℹ️ Top & Bottom 3 by Composite")
+                    st.markdown(HELP_CONTENT['top_bottom_composite'])
+            
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
             st.dataframe(_sty(t3), hide_index=True, use_container_width=True, height=140)
             
@@ -770,7 +852,16 @@ with tab1:
             
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
     st.divider()
-    st.subheader('Benchmark Price Action')
+    
+    # Benchmark Price Action with Info Icon
+    col_bpa_title, col_bpa_info = st.columns([0.9, 0.1])
+    with col_bpa_title:
+        st.subheader('Benchmark Price Action')
+    with col_bpa_info:
+        if st.button('ⓘ', key='help_benchmark_price_action', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ Benchmark Price Action")
+            st.markdown(HELP_CONTENT['benchmark_price_action'])
+    
     st.caption('Interactive instructions: hover for OHLC details and use the dropdown to change the viewing window. Takeaway: this chart shows short-term trend structure, reversals, and volatility in SPY.')
     spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
     spy_start = {'3M': prices.index.max() - pd.DateOffset(months=3), '6M': prices.index.max() - pd.DateOffset(months=6), '1Y': prices.index.max() - pd.DateOffset(years=1), 'Since 2015': pd.Timestamp(START)}[spy_window]
@@ -785,7 +876,16 @@ with tab1:
         st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
     else:
         st.info('SPY candlestick data unavailable.')
-    st.subheader('Daily Positioning Feed')
+    
+    # Daily Positioning Feed with Info Icon
+    col_dpf_title, col_dpf_info = st.columns([0.9, 0.1])
+    with col_dpf_title:
+        st.subheader('Daily Positioning Feed')
+    with col_dpf_info:
+        if st.button('ⓘ', key='help_daily_positioning', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ Daily Positioning Feed")
+            st.markdown(HELP_CONTENT['daily_positioning'])
+    
     st.caption('Interactive instructions: use the regime window selector to compare recent shifts across 3M, 6M, and 12M horizons. Takeaway: these four charts summarize whether leadership is broad or narrow, defensive or cyclical, and whether trading activity is unusually elevated.')
     regime_window = st.radio('Regime window', ['3M', '6M', '12M'], horizontal=True, key='regime_window', index=2)
     regime_months = {'3M': 3, '6M': 6, '12M': 12}[regime_window]
@@ -865,7 +965,16 @@ with tab1:
         except Exception:
             st.info('SPY volume unavailable.')
     st.divider()
-    st.subheader('Relative Performance')
+    
+    # Relative Performance with Info Icon
+    col_rp_title, col_rp_info = st.columns([0.9, 0.1])
+    with col_rp_title:
+        st.subheader('Relative Performance')
+    with col_rp_info:
+        if st.button('ⓘ', key='help_relative_performance', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ Relative Performance")
+            st.markdown(HELP_CONTENT['relative_performance'])
+    
     pf = st.radio('Period', list(period_opts.keys()), horizontal=True, key='pf')
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
 
@@ -1025,6 +1134,16 @@ with tab2:
             col.metric(lbl, 'N/A')
     st.markdown(SRC_FRED, unsafe_allow_html=True)
     st.divider()
+    
+    # Yield Curve Section with Info Icon
+    col_yc_title, col_yc_info = st.columns([0.9, 0.1])
+    with col_yc_title:
+        st.subheader('Yield Curve & Treasury Rates')
+    with col_yc_info:
+        if st.button('ⓘ', key='help_yield_curve', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ Yield Curve")
+            st.markdown(HELP_CONTENT['yield_curve'])
+    
     rp = st.radio('Period', ['1Y', '3Y', '5Y', '10Y', 'Full'], horizontal=True, key='rp')
     rmons = {'1Y': 12, '3Y': 36, '5Y': 60, '10Y': 120, 'Full': None}[rp]
     yc_col, yld_col = st.columns(2)
@@ -1045,6 +1164,16 @@ with tab2:
         fig.update_layout(title=chart_title('Treasury Yields', 'Constant-maturity daily'), template='plotly_white', height=380, yaxis_title='Yield (%)', margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False)
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_yields', config=PCFG)
+    
+    # Yield Spreads, Real Yields, and Credit Spreads Section with Info Icon
+    col_spread_title, col_spread_info = st.columns([0.9, 0.1])
+    with col_spread_title:
+        st.subheader('Market Structure: Spreads & Credit')
+    with col_spread_info:
+        if st.button('ⓘ', key='help_credit_spreads', help='Click for details', use_container_width=True):
+            st.popover("ℹ️ Credit Spreads")
+            st.markdown(HELP_CONTENT['credit_spreads'])
+    
     r2a, r2b, r2c = st.columns(3)
     with r2a:
         fig = go.Figure()
@@ -1148,7 +1277,14 @@ with tab2:
 with tab3:
     cl, cr3 = st.columns([3, 1])
     with cl:
-        st.subheader('Upcoming Releases')
+        col_ur_title, col_ur_info = st.columns([0.9, 0.1])
+        with col_ur_title:
+            st.subheader('Upcoming Releases')
+        with col_ur_info:
+            if st.button('ⓘ', key='help_macro_releases', help='Click for details', use_container_width=True):
+                st.popover("ℹ️ Macro Releases")
+                st.markdown(HELP_CONTENT['macro_releases'])
+        
         st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
         with st.spinner('Loading...'):
             snap = fetch_release_snapshot()
@@ -1156,7 +1292,15 @@ with tab3:
                 st.dataframe(snap.style.apply(snap_color, axis=1).format({'Previous': safe_fmt, 'Latest': safe_fmt}, na_rep='---'), hide_index=True, use_container_width=True, height=420)
                 st.markdown(SRC_FRED, unsafe_allow_html=True)
         st.divider()
-        st.subheader('Release Calendar')
+        
+        col_rc_title, col_rc_info = st.columns([0.9, 0.1])
+        with col_rc_title:
+            st.subheader('Release Calendar')
+        with col_rc_info:
+            if st.button('ⓘ', key='help_release_calendar', help='Click for details', use_container_width=True):
+                st.popover("ℹ️ Release Calendar")
+                st.markdown("Shows a chronological view of recent and upcoming economic releases. This helps you anticipate volatility windows and major market-moving events. Orange highlights = today; dates after = coming events.")
+        
         st.caption('Interactive instructions: scroll through the calendar and use the color cues to distinguish past, present, and upcoming events. Takeaway: this gives timing context for when major macro catalysts may affect the market.')
         with st.spinner('Loading calendar...'):
             cal = fetch_fred_calendar()
