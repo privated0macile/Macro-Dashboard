@@ -554,9 +554,6 @@ with tab1:
         if not df_pos.empty and 'Composite' in df_pos.columns:
             df_pos = df_pos.dropna(subset=['Composite']).sort_values('Composite', ascending=False).reset_index(drop=True)
             t3, b3 = (df_pos.head(3), df_pos.tail(3))
-            dd = pd.concat([t3, b3], ignore_index=True)
-            st.markdown('**Top 3 / Bottom 3 by Composite**')
-            st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
 
             def _sty(d):
                 """ sty."""
@@ -581,12 +578,7 @@ with tab1:
                         return ''
                     return 'color:#2ca02c' if v > 0 else 'color:#d62728' if v < 0 else ''
 
-                def row_border(row):
-                    """Row border."""
-                    if row.name == 2:
-                        return ['border-bottom:2px solid #333'] * len(row)
-                    return [''] * len(row)
-                s = d.style.apply(row_border, axis=1)
+                s = d.style
                 for c in ['Flow Z', 'Composite']:
                     if c in d.columns:
                         s = s.map(cz, subset=[c])
@@ -595,7 +587,15 @@ with tab1:
                         s = s.map(cr2, subset=[c])
                 fmt = {c: '{:+.2f}' for c in ['1D', '5D', '1M', '12M', 'Flow Z', 'Composite'] if c in d.columns}
                 return s.format(fmt, na_rep='---')
-            st.dataframe(_sty(dd), hide_index=True, use_container_width=True, height=260)
+            
+            st.markdown('**Top 3 by Composite**')
+            st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
+            st.dataframe(_sty(t3), hide_index=True, use_container_width=True, height=140)
+            
+            st.markdown('**Bottom 3 by Composite**')
+            st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
+            st.dataframe(_sty(b3), hide_index=True, use_container_width=True, height=140)
+            
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
     st.divider()
     st.subheader('Benchmark Price Action')
