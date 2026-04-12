@@ -502,8 +502,180 @@ def build_yield_curve():
     add_src(fig, -0.18)
     return fig
 st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-items:baseline">\n    <h1 style="margin:0">Macro Dashboard</h1>\n    <span style="color:#888;font-size:0.85rem">\n        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}\n        &nbsp;/&nbsp; Data: FRED / Yahoo Finance\n    </span>\n</div>\n""", unsafe_allow_html=True)
-st.markdown(f'\n<div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">\n  <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and is refreshed hourly from cached calls.</p>\n  <p style="margin:0;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Every chart includes a short caption describing what it shows, why it matters, and the data source.</p>\n</div>\n', unsafe_allow_html=True)
-tab1, tab2, tab3 = st.tabs(['Equities', 'Fixed Income & Macro', 'Calendar'])
+st.markdown(f"""
+<div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
+  <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222">
+    <strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and is refreshed hourly from cached calls.
+  </p>
+  <p style="margin:0;font-size:0.85rem;color:#555">
+    Use hover details and legend clicks to inspect each series. Radio buttons and dropdown menus allow you to change time windows and compare market behavior across multiple horizons.
+  </p>
+</div>
+""", unsafe_allow_html=True)
+tab0, tab1, tab2, tab3, tab4 = st.tabs([
+    'Introduction',
+    'Equities',
+    'Fixed Income & Macro',
+    'Calendar',
+    'Conclusion'
+])
+
+with tab0:
+    st.title("Introduction")
+
+    st.markdown("""
+### Project Overview
+This dashboard connects **macroeconomic conditions** with **equity market behavior** using data from **FRED** and **Yahoo Finance**. The goal is to help users interpret how inflation, interest rates, growth expectations, breadth, and ETF positioning interact rather than looking at each signal in isolation.
+
+The app is organized around several linked layers:
+- broad U.S. index performance
+- sector and factor leadership
+- ETF flow and positioning signals
+- fixed income and macro context
+- calendar timing through releases and FOMC dates
+
+### How to Use the Dashboard
+- Navigate with the tabs across the top
+- Use radio buttons and dropdowns to adjust the time horizon
+- Hover over charts for exact values
+- Click legend items on interactive charts to isolate series
+
+### Main Questions This Dashboard Helps Answer
+- Is the market broad or concentrated?
+- Are sectors and factors seeing accumulation or distribution?
+- What macro conditions are supporting or challenging risk appetite?
+- When are the next important economic and policy catalysts?
+""")
+
+    st.divider()
+
+    st.subheader("Quick Preview")
+    st.caption("These two visuals introduce the dashboard by showing a short-term market snapshot and a cross-sectional sector heatmap.")
+
+    intro_left, intro_right = st.columns(2)
+
+    with intro_left:
+        st.markdown("**SPY Candlestick Preview**")
+        st.caption("Interactive instructions: hover for OHLC details and use the moving-average legend to isolate the line. Takeaway: candlesticks help show short-term trend direction, reversal behavior, and recent volatility in the broad market.")
+
+        try:
+            intro_ohlc = fetch_benchmark_ohlc(
+                start=(pd.Timestamp.today() - pd.DateOffset(months=3)).strftime("%Y-%m-%d")
+            )
+
+            if not intro_ohlc.empty:
+                fig_intro_candle = go.Figure()
+                fig_intro_candle.add_trace(go.Candlestick(
+                    x=intro_ohlc.index,
+                    open=intro_ohlc["Open"],
+                    high=intro_ohlc["High"],
+                    low=intro_ohlc["Low"],
+                    close=intro_ohlc["Close"],
+                    increasing_line_color="#2ca02c",
+                    decreasing_line_color="#d62728",
+                    name="SPY"
+                ))
+                fig_intro_candle.add_trace(go.Scatter(
+                    x=intro_ohlc.index,
+                    y=intro_ohlc["Close"].rolling(20).mean(),
+                    mode="lines",
+                    line=dict(color="#1f77b4", width=1.8),
+                    name="20D MA"
+                ))
+                fig_intro_candle.update_layout(
+                    title=chart_title("SPY Preview", "Recent candlestick view"),
+                    template="plotly_white",
+                    height=360,
+                    margin=dict(b=65, t=55, l=55, r=35),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.18,
+                        x=0.5,
+                        xanchor="center",
+                        font=dict(size=11)
+                    ),
+                    dragmode=False
+                )
+                fig_intro_candle.update_yaxes(title_text="Price ($)")
+                add_src(fig_intro_candle, -0.22)
+                st.plotly_chart(fig_intro_candle, use_container_width=True, config=PCFG)
+            else:
+                st.info("Intro candlestick preview unavailable.")
+        except Exception:
+            st.info("Intro candlestick preview unavailable.")
+
+    with intro_right:
+        st.markdown("**Sector Heatmap Preview**")
+        st.caption("Interactive instructions: hover over each cell to compare 5-day and 1-month returns across sectors. Takeaway: the heatmap quickly shows which sectors are leading, lagging, or diverging across short-term horizons.")
+
+        try:
+            prices_intro, _ = fetch_equity()
+            sector_rows_intro = []
+
+            for ticker, name in SECTORS.items():
+                if ticker not in prices_intro.columns:
+                    continue
+                series = prices_intro[ticker].dropna()
+                if len(series) < 22:
+                    continue
+
+                ret_1m = (series.iloc[-1] / series.iloc[-21] - 1) * 100
+                ret_5d = (series.iloc[-1] / series.iloc[-5] - 1) * 100 if len(series) >= 5 else np.nan
+
+                sector_rows_intro.append({
+                    "Ticker": ticker,
+                    "Sector": name,
+                    "1M Return": round(ret_1m, 2),
+                    "5D Return": round(ret_5d, 2) if pd.notna(ret_5d) else np.nan
+                })
+
+            intro_heat_df = pd.DataFrame(sector_rows_intro)
+
+            if not intro_heat_df.empty:
+                intro_heat = (
+                    alt.Chart(intro_heat_df)
+                    .mark_rect(cornerRadius=4)
+                    .encode(
+                        x=alt.X("Ticker:N", sort=list(SECTORS.keys()), title=None),
+                        y=alt.Y("Metric:N", title=None),
+                        color=alt.Color(
+                            "Value:Q",
+                            scale=alt.Scale(scheme="redyellowgreen"),
+                            title="Return %"
+                        ),
+                        tooltip=[
+                            "Sector:N",
+                            "Ticker:N",
+                            "Metric:N",
+                            alt.Tooltip("Value:Q", format=".2f")
+                        ]
+                    )
+                    .transform_fold(
+                        ["1M Return", "5D Return"],
+                        as_=["Metric", "Value"]
+                    )
+                    .properties(height=220, title="Sector return heatmap preview")
+                )
+                st.altair_chart(intro_heat, use_container_width=True)
+                st.markdown(SRC_BOTH, unsafe_allow_html=True)
+            else:
+                st.info("Intro heatmap preview unavailable.")
+        except Exception:
+            st.info("Intro heatmap preview unavailable.")
+
+    st.divider()
+
+    st.markdown("""
+### How to Read the Rest of the Dashboard
+- The **Equities** tab focuses on index behavior, breadth, relative performance, ETF flows, and holdings attribution.
+- The **Fixed Income & Macro** tab provides the policy and economic backdrop through yields, spreads, inflation, and growth.
+- The **Calendar** tab adds timing context through recent and upcoming macro releases and FOMC dates.
+
+### Intro Takeaway
+The dashboard is intended to be read as a **connected system**. Price action, sector leadership, flows, yields, inflation, and policy all reinforce or challenge one another. The strongest signals usually come from **confluence across multiple sections**, not from a single chart alone.
+""")
+
 with tab1:
     with st.spinner('Loading equity data...'):
         prices, volumes = fetch_equity()
@@ -599,7 +771,7 @@ with tab1:
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
     st.divider()
     st.subheader('Benchmark Price Action')
-    st.caption('Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.')
+    st.caption('Interactive instructions: hover for OHLC details and use the dropdown to change the viewing window. Takeaway: this chart shows short-term trend structure, reversals, and volatility in SPY.')
     spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
     spy_start = {'3M': prices.index.max() - pd.DateOffset(months=3), '6M': prices.index.max() - pd.DateOffset(months=6), '1Y': prices.index.max() - pd.DateOffset(years=1), 'Since 2015': pd.Timestamp(START)}[spy_window]
     spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
@@ -614,7 +786,7 @@ with tab1:
     else:
         st.info('SPY candlestick data unavailable.')
     st.subheader('Daily Positioning Feed')
-    st.caption('Macro vs Micro = between-sector vs within-sector dispersion (252d percentile rank) / Breadth = RSP/SPY ratio (equal-weight vs cap-weight) / Cyclical/Defensive = equal-weight basket ratio / SPY Volume = volume z-scored against 1Y median.')
+    st.caption('Interactive instructions: use the regime window selector to compare recent shifts across 3M, 6M, and 12M horizons. Takeaway: these four charts summarize whether leadership is broad or narrow, defensive or cyclical, and whether trading activity is unusually elevated.')
     regime_window = st.radio('Regime window', ['3M', '6M', '12M'], horizontal=True, key='regime_window', index=2)
     regime_months = {'3M': 3, '6M': 6, '12M': 12}[regime_window]
     regime_cutoff = prices.index.max() - pd.DateOffset(months=regime_months)
@@ -731,7 +903,7 @@ with tab1:
     _build_pair(SECTORS_DEFENSIVE, 'Defensive-Tilt', base, 'defensive')
     st.divider()
     st.subheader('Individual ETF -- Flow & Price')
-    st.caption('Return % from window start / flow z-score (252d rolling, clipped +/-3) / green = accumulation, red = distribution')
+    st.caption('Interactive instructions: use the chart window selector to switch between 3M, 6M, and 1Y views, then hover over each chart for values. Takeaway: rising prices with positive flow bars suggest stronger confirmation, while price gains with negative flows may indicate weaker participation.')
     cwopt = st.radio('Chart window', ['3M', '6M', '1Y'], horizontal=True, key='etf_cw', index=1)
     cbd = {'3M': 63, '6M': 126, '1Y': 252}[cwopt]
 
@@ -778,7 +950,7 @@ with tab1:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
     st.divider()
     st.subheader('Altair Views')
-    st.caption('A pair of lighter-weight Altair visuals to make the cross-section easier to scan.')
+    st.caption('Interactive instructions: hover to compare sectors and macro series more quickly than in the larger charts. Takeaway: these compressed views help identify short-term winners, laggards, and macro relationships at a glance.')
     alt_left, alt_right = st.columns(2)
     with alt_left:
         try:
@@ -818,7 +990,7 @@ with tab1:
             st.info('Altair macro chart unavailable.')
     st.divider()
     st.subheader('Sector ETF Holdings & Daily Attribution')
-    st.caption('Expand any sector to see top holdings, weight, daily return, and contribution (weight x return). Sorted by contribution. Weights are hardcoded and updated biannually -- minor drift expected between updates.')
+    st.caption('Interactive instructions: expand any sector ETF to inspect the holdings table. Takeaway: this section shows which stocks are driving daily ETF performance and whether sector moves are concentrated in a few names or spread more broadly.')
     ec = st.columns(2)
     for i, (t, n) in enumerate(SECTORS.items()):
         with ec[i % 2]:
@@ -977,7 +1149,7 @@ with tab3:
     cl, cr3 = st.columns([3, 1])
     with cl:
         st.subheader('Upcoming Releases')
-        st.caption('FRED releases -- next 45 days and past 35 days')
+        st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
         with st.spinner('Loading...'):
             snap = fetch_release_snapshot()
             if not snap.empty:
@@ -985,7 +1157,7 @@ with tab3:
                 st.markdown(SRC_FRED, unsafe_allow_html=True)
         st.divider()
         st.subheader('Release Calendar')
-        st.caption('FRED release schedule -- past 35 days and next 45 days / yellow = today / gray = past')
+        st.caption('Interactive instructions: scroll through the calendar and use the color cues to distinguish past, present, and upcoming events. Takeaway: this gives timing context for when major macro catalysts may affect the market.')
         with st.spinner('Loading calendar...'):
             cal = fetch_fred_calendar()
             if cal.empty:
@@ -1029,3 +1201,36 @@ with tab3:
             st.metric('Fed Funds', 'N/A')
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
+
+with tab4:
+    st.title("Conclusion")
+
+    st.markdown("""
+### Final Conclusions
+This dashboard suggests that market interpretation is strongest when **price action**, **positioning**, and the **macro backdrop** are read together rather than in isolation.
+
+### Main Lessons from the Dashboard
+- **Breadth** helps distinguish healthy market participation from narrow concentration.
+- **Sector and factor relative performance** show where leadership is rotating.
+- **Flow z-scores** offer a proxy for accumulation versus distribution.
+- **Yield curves, spreads, inflation, and Fed policy** provide the macro explanation for shifts in risk appetite.
+- **Calendar timing** matters because macro releases and Fed meetings often act as catalysts for repricing.
+
+### Interaction Guidance
+- Use the **Equities** tab to compare leadership and positioning across sectors and factors.
+- Use the **Fixed Income & Macro** tab to connect market moves to rates, inflation, and economic growth.
+- Use the **Calendar** tab to identify upcoming events that may influence these trends.
+
+### Overall Takeaway
+The most useful signal in this project is not any single chart. Instead, the strongest interpretation comes from **confluence**:
+- broad participation plus positive flows plus supportive macro conditions suggests a healthier backdrop
+- narrowing breadth, defensive leadership, and wider spreads suggest a more cautious environment
+
+### Limitations
+- ETF flows here are proxies rather than exact fund flow data
+- market data can be delayed or incomplete
+- short-term readings may reverse quickly without broader confirmation
+
+### Final Note
+This dashboard is meant to support interpretation and discussion. Its value comes from helping the user move from isolated observations to a broader market narrative.
+""")
