@@ -519,44 +519,140 @@ HELP_CONTENT = {
     'fomc_calendar': 'Lists upcoming Federal Reserve decision dates and what the market expects. FOMC meetings occur 8 times per year. Policy changes at these meetings can move markets significantly.',
 }
 
-def show_info_icon(key, title=None):
+def init_modal_state():
+    """Initialize session state for modals."""
+    if 'open_modals' not in st.session_state:
+        st.session_state.open_modals = set()
+
+def toggle_modal(modal_key):
+    """Toggle modal open/closed state."""
+    if modal_key in st.session_state.open_modals:
+        st.session_state.open_modals.discard(modal_key)
+    else:
+        st.session_state.open_modals.add(modal_key)
+
+def render_modal_overlay(modal_key, title, content):
+    """Render a modal overlay with content and close button."""
+    if modal_key not in st.session_state.open_modals:
+        return
+    
+    modal_html = f"""
+    <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+        padding: 20px;
+        box-sizing: border-box;
+    " onclick="if(event.target === this) document.querySelector('[data-modal-key=\\'{modal_key}\\']')?.click()">
+        <div style="
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+        ">
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #e6e6e6;
+                padding-bottom: 15px;
+            ">
+                <h2 style="margin: 0; font-size: 1.3rem; color: #333;">ℹ️ {title}</h2>
+                <button onclick="document.querySelector('[data-modal-key=\\'{modal_key}\\']')?.click()" 
+                    style="
+                    background: none;
+                    border: none;
+                    font-size: 24px;
+                    cursor: pointer;
+                    color: #999;
+                    padding: 0;
+                    width: 30px;
+                    height: 30px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                ">✕</button>
+            </div>
+            <div style="font-size: 0.95rem; line-height: 1.6; color: #555;">
+                {content}
+            </div>
+            <div style="
+                margin-top: 20px;
+                padding-top: 15px;
+                border-top: 1px solid #e6e6e6;
+                font-size: 0.85rem;
+                color: #999;
+            ">
+                💡 Click outside or press the ✕ button to close
+            </div>
+        </div>
+    </div>
     """
-    Display an info icon (ⓘ) that opens a popover with help text.
+    
+    st.markdown(modal_html, unsafe_allow_html=True)
+
+def show_info_icon_inline(key, title=None, position='right'):
+    """
+    Display a small info icon (ⓘ) inline with chart title that opens a modal overlay.
+    Use in columns next to the chart title.
     
     Args:
-        key: identifier in HELP_CONTENT dict (e.g., 'us_major_indices')
-        title: optional custom title for the popover (defaults to key name)
+        key: identifier in HELP_CONTENT dict
+        title: optional custom title for the modal (defaults to key name)
+        position: 'right' or 'left' for icon placement
     """
+    init_modal_state()
+    
     if key not in HELP_CONTENT:
         return
     
     help_text = HELP_CONTENT[key]
-    unique_key = f"help_{key}_{id(st)}"
+    modal_key = f"modal_{key}"
+    display_title = title or key.replace('_', ' ').title()
+    
+    # Create a button to toggle the modal
+    if st.button(f'ⓘ', key=f"btn_{modal_key}", help='Click for details', use_container_width=False):
+        toggle_modal(modal_key)
+    
+    # Render the modal if it's open
+    render_modal_overlay(modal_key, display_title, help_text)
+
+def show_info_icon(key, title=None):
+    """
+    Display an info icon (ⓘ) that opens a modal overlay with help text.
+    
+    Args:
+        key: identifier in HELP_CONTENT dict (e.g., 'us_major_indices')
+        title: optional custom title for the modal (defaults to key name)
+    """
+    init_modal_state()
+    
+    if key not in HELP_CONTENT:
+        return
+    
+    help_text = HELP_CONTENT[key]
+    modal_key = f"modal_{key}"
+    display_title = title or key.replace('_', ' ').title()
     
     col_icon, _ = st.columns([0.05, 0.95])
     with col_icon:
-        if st.button('ⓘ', key=unique_key, help='Click for details'):
-            st.popover(f"ℹ️ {title or key.replace('_', ' ').title()}")
-            st.markdown(help_text)
-            st.divider()
-            st.caption("💡 Hover or click the ⓘ icon to see this again.")
-
-def show_info_inline(key, title=None):
-    """
-    Display an info icon on the same line as a header/title using columns.
-    Useful for headers that need an info icon next to them.
+        if st.button('ⓘ', key=f"btn_{modal_key}", help='Click for details'):
+            toggle_modal(modal_key)
     
-    Returns two columns: first for the icon, second for content after it.
-    """
-    col1, col2 = st.columns([0.08, 0.92])
-    with col1:
-        if key in HELP_CONTENT:
-            help_text = HELP_CONTENT[key]
-            unique_key = f"help_inline_{key}_{id(st)}"
-            if st.button('ⓘ', key=unique_key, help=help_text, use_container_width=True):
-                st.popover(f"ℹ️ {title or key.replace('_', ' ').title()}")
-                st.markdown(help_text)
-    return col2
+    render_modal_overlay(modal_key, display_title, help_text)
 st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-items:baseline">\n    <h1 style="margin:0">Macro Dashboard</h1>\n    <span style="color:#888;font-size:0.85rem">\n        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}\n        &nbsp;/&nbsp; Data: FRED / Yahoo Finance\n    </span>\n</div>\n""", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
@@ -738,13 +834,11 @@ with tab1:
     period_opts = {'Past 12M': None, 'Since 2015': '2015-01-01', 'Since 2020': '2020-01-01', 'Since 2025': '2025-01-01'}
     
     # U.S. Major Indices Section with Info Icon
-    col_title, col_info = st.columns([0.9, 0.1])
+    col_title, col_info = st.columns([0.92, 0.08])
     with col_title:
         st.subheader("U.S. Major Indices")
     with col_info:
-        if st.button('ⓘ', key='help_us_major_indices', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ U.S. Major Indices")
-            st.markdown(HELP_CONTENT['us_major_indices'])
+        show_info_icon_inline('us_major_indices', 'U.S. Major Indices')
     
     hdr_l, hdr_r = st.columns(2)
     with hdr_l:
@@ -766,13 +860,11 @@ with tab1:
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
     with hdr_r:
         # Sector Positioning with Info Icon
-        col_sect_title, col_sect_info = st.columns([0.85, 0.15])
+        col_sect_title, col_sect_info = st.columns([0.92, 0.08])
         with col_sect_title:
             st.subheader("Sector Positioning")
         with col_sect_info:
-            if st.button('ⓘ', key='help_sector_positioning', help='Click for details', use_container_width=True):
-                st.popover("ℹ️ Sector Positioning")
-                st.markdown(HELP_CONTENT['sector_positioning'])
+            show_info_icon_inline('sector_positioning', 'Sector Positioning')
         
         rows = []
         for t, n in SECTORS.items():
@@ -835,13 +927,11 @@ with tab1:
                 fmt = {c: '{:+.2f}' for c in ['1D', '5D', '1M', '12M', 'Flow Z', 'Composite'] if c in d.columns}
                 return s.format(fmt, na_rep='---')
             
-            col_top_title, col_top_info = st.columns([0.85, 0.15])
+            col_top_title, col_top_info = st.columns([0.9, 0.1])
             with col_top_title:
                 st.markdown('**Top 3 by Composite**')
             with col_top_info:
-                if st.button('ⓘ', key='help_top_bottom_composite', help='Click for details', use_container_width=True):
-                    st.popover("ℹ️ Top & Bottom 3 by Composite")
-                    st.markdown(HELP_CONTENT['top_bottom_composite'])
+                show_info_icon_inline('top_bottom_composite', 'Top & Bottom 3 by Composite')
             
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
             st.dataframe(_sty(t3), hide_index=True, use_container_width=True, height=140)
@@ -854,13 +944,11 @@ with tab1:
     st.divider()
     
     # Benchmark Price Action with Info Icon
-    col_bpa_title, col_bpa_info = st.columns([0.9, 0.1])
+    col_bpa_title, col_bpa_info = st.columns([0.92, 0.08])
     with col_bpa_title:
         st.subheader('Benchmark Price Action')
     with col_bpa_info:
-        if st.button('ⓘ', key='help_benchmark_price_action', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ Benchmark Price Action")
-            st.markdown(HELP_CONTENT['benchmark_price_action'])
+        show_info_icon_inline('benchmark_price_action', 'Benchmark Price Action')
     
     st.caption('Interactive instructions: hover for OHLC details and use the dropdown to change the viewing window. Takeaway: this chart shows short-term trend structure, reversals, and volatility in SPY.')
     spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
@@ -878,13 +966,11 @@ with tab1:
         st.info('SPY candlestick data unavailable.')
     
     # Daily Positioning Feed with Info Icon
-    col_dpf_title, col_dpf_info = st.columns([0.9, 0.1])
+    col_dpf_title, col_dpf_info = st.columns([0.92, 0.08])
     with col_dpf_title:
         st.subheader('Daily Positioning Feed')
     with col_dpf_info:
-        if st.button('ⓘ', key='help_daily_positioning', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ Daily Positioning Feed")
-            st.markdown(HELP_CONTENT['daily_positioning'])
+        show_info_icon_inline('daily_positioning', 'Daily Positioning Feed')
     
     st.caption('Interactive instructions: use the regime window selector to compare recent shifts across 3M, 6M, and 12M horizons. Takeaway: these four charts summarize whether leadership is broad or narrow, defensive or cyclical, and whether trading activity is unusually elevated.')
     regime_window = st.radio('Regime window', ['3M', '6M', '12M'], horizontal=True, key='regime_window', index=2)
@@ -967,13 +1053,11 @@ with tab1:
     st.divider()
     
     # Relative Performance with Info Icon
-    col_rp_title, col_rp_info = st.columns([0.9, 0.1])
+    col_rp_title, col_rp_info = st.columns([0.92, 0.08])
     with col_rp_title:
         st.subheader('Relative Performance')
     with col_rp_info:
-        if st.button('ⓘ', key='help_relative_performance', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ Relative Performance")
-            st.markdown(HELP_CONTENT['relative_performance'])
+        show_info_icon_inline('relative_performance', 'Relative Performance')
     
     pf = st.radio('Period', list(period_opts.keys()), horizontal=True, key='pf')
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
@@ -1136,13 +1220,11 @@ with tab2:
     st.divider()
     
     # Yield Curve Section with Info Icon
-    col_yc_title, col_yc_info = st.columns([0.9, 0.1])
+    col_yc_title, col_yc_info = st.columns([0.92, 0.08])
     with col_yc_title:
         st.subheader('Yield Curve & Treasury Rates')
     with col_yc_info:
-        if st.button('ⓘ', key='help_yield_curve', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ Yield Curve")
-            st.markdown(HELP_CONTENT['yield_curve'])
+        show_info_icon_inline('yield_curve', 'Yield Curve')
     
     rp = st.radio('Period', ['1Y', '3Y', '5Y', '10Y', 'Full'], horizontal=True, key='rp')
     rmons = {'1Y': 12, '3Y': 36, '5Y': 60, '10Y': 120, 'Full': None}[rp]
@@ -1166,13 +1248,11 @@ with tab2:
         st.plotly_chart(fig, use_container_width=True, key='fig_yields', config=PCFG)
     
     # Yield Spreads, Real Yields, and Credit Spreads Section with Info Icon
-    col_spread_title, col_spread_info = st.columns([0.9, 0.1])
+    col_spread_title, col_spread_info = st.columns([0.92, 0.08])
     with col_spread_title:
         st.subheader('Market Structure: Spreads & Credit')
     with col_spread_info:
-        if st.button('ⓘ', key='help_credit_spreads', help='Click for details', use_container_width=True):
-            st.popover("ℹ️ Credit Spreads")
-            st.markdown(HELP_CONTENT['credit_spreads'])
+        show_info_icon_inline('credit_spreads', 'Credit Spreads')
     
     r2a, r2b, r2c = st.columns(3)
     with r2a:
@@ -1277,13 +1357,11 @@ with tab2:
 with tab3:
     cl, cr3 = st.columns([3, 1])
     with cl:
-        col_ur_title, col_ur_info = st.columns([0.9, 0.1])
+        col_ur_title, col_ur_info = st.columns([0.92, 0.08])
         with col_ur_title:
             st.subheader('Upcoming Releases')
         with col_ur_info:
-            if st.button('ⓘ', key='help_macro_releases', help='Click for details', use_container_width=True):
-                st.popover("ℹ️ Macro Releases")
-                st.markdown(HELP_CONTENT['macro_releases'])
+            show_info_icon_inline('macro_releases', 'Macro Releases')
         
         st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
         with st.spinner('Loading...'):
@@ -1293,13 +1371,11 @@ with tab3:
                 st.markdown(SRC_FRED, unsafe_allow_html=True)
         st.divider()
         
-        col_rc_title, col_rc_info = st.columns([0.9, 0.1])
+        col_rc_title, col_rc_info = st.columns([0.92, 0.08])
         with col_rc_title:
             st.subheader('Release Calendar')
         with col_rc_info:
-            if st.button('ⓘ', key='help_release_calendar', help='Click for details', use_container_width=True):
-                st.popover("ℹ️ Release Calendar")
-                st.markdown("Shows a chronological view of recent and upcoming economic releases. This helps you anticipate volatility windows and major market-moving events. Orange highlights = today; dates after = coming events.")
+            show_info_icon_inline('fomc_calendar', 'Release Calendar')
         
         st.caption('Interactive instructions: scroll through the calendar and use the color cues to distinguish past, present, and upcoming events. Takeaway: this gives timing context for when major macro catalysts may affect the market.')
         with st.spinner('Loading calendar...'):
