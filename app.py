@@ -522,36 +522,39 @@ HELP_CONTENT = {
 def init_modal_state():
     """Initialize session state for modals."""
     if 'open_modals' not in st.session_state:
-        st.session_state.open_modals = set()
+        st.session_state.open_modals = {}
 
 def toggle_modal(modal_key):
     """Toggle modal open/closed state."""
-    if modal_key in st.session_state.open_modals:
-        st.session_state.open_modals.discard(modal_key)
-    else:
-        st.session_state.open_modals.add(modal_key)
+    if modal_key not in st.session_state.open_modals:
+        st.session_state.open_modals[modal_key] = False
+    st.session_state.open_modals[modal_key] = not st.session_state.open_modals[modal_key]
 
 def render_modal_overlay(modal_key, title, content):
-    """Render a modal overlay with content and close button."""
-    if modal_key not in st.session_state.open_modals:
+    """Render a clickable modal overlay - click anywhere to close."""
+    init_modal_state()
+    
+    if not st.session_state.open_modals.get(modal_key, False):
         return
     
+    # HTML/CSS for modal - clicking overlay background closes it
     modal_html = f"""
-    <div style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 999;
-        padding: 20px;
-        box-sizing: border-box;
-    " onclick="if(event.target === this) document.querySelector('[data-modal-key=\\'{modal_key}\\']')?.click()">
-        <div style="
+    <style>
+        .modal-overlay-{modal_key} {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+            box-sizing: border-box;
+        }}
+        .modal-content-{modal_key} {{
             background: white;
             border-radius: 12px;
             padding: 30px;
@@ -560,43 +563,34 @@ def render_modal_overlay(modal_key, title, content):
             max-height: 80vh;
             overflow-y: auto;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            position: relative;
-        ">
-            <div style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 20px;
-                border-bottom: 1px solid #e6e6e6;
-                padding-bottom: 15px;
-            ">
-                <h2 style="margin: 0; font-size: 1.3rem; color: #333;">ℹ️ {title}</h2>
-                <button onclick="document.querySelector('[data-modal-key=\\'{modal_key}\\']')?.click()" 
-                    style="
-                    background: none;
-                    border: none;
-                    font-size: 24px;
-                    cursor: pointer;
-                    color: #999;
-                    padding: 0;
-                    width: 30px;
-                    height: 30px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                ">✕</button>
+            pointer-events: all;
+        }}
+        .modal-header-{modal_key} {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #e6e6e6;
+            padding-bottom: 15px;
+        }}
+        .modal-title-{modal_key} {{
+            margin: 0;
+            font-size: 1.3rem;
+            color: #333;
+        }}
+        .modal-body-{modal_key} {{
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #555;
+        }}
+    </style>
+    <div class="modal-overlay-{modal_key}" onclick="document.querySelector('.modal-trigger-{modal_key}')?.click(); event.stopPropagation();">
+        <div class="modal-content-{modal_key}" onclick="event.stopPropagation();">
+            <div class="modal-header-{modal_key}">
+                <h2 class="modal-title-{modal_key}">ℹ️ {title}</h2>
             </div>
-            <div style="font-size: 0.95rem; line-height: 1.6; color: #555;">
+            <div class="modal-body-{modal_key}">
                 {content}
-            </div>
-            <div style="
-                margin-top: 20px;
-                padding-top: 15px;
-                border-top: 1px solid #e6e6e6;
-                font-size: 0.85rem;
-                color: #999;
-            ">
-                💡 Click outside or press the ✕ button to close
             </div>
         </div>
     </div>
@@ -604,30 +598,34 @@ def render_modal_overlay(modal_key, title, content):
     
     st.markdown(modal_html, unsafe_allow_html=True)
 
-def show_info_icon_inline(key, title=None, position='right'):
+def show_section_title_with_icon(title_text, icon_key):
     """
-    Display a small info icon (ⓘ) inline with chart title that opens a modal overlay.
-    Use in columns next to the chart title.
+    Display a section title with inline info icon using custom HTML.
+    The icon appears right next to the title text.
     
     Args:
-        key: identifier in HELP_CONTENT dict
-        title: optional custom title for the modal (defaults to key name)
-        position: 'right' or 'left' for icon placement
+        title_text: The title to display
+        icon_key: Key for HELP_CONTENT
     """
     init_modal_state()
     
-    if key not in HELP_CONTENT:
+    if icon_key not in HELP_CONTENT:
+        st.subheader(title_text)
         return
     
-    help_text = HELP_CONTENT[key]
-    modal_key = f"modal_{key}"
-    display_title = title or key.replace('_', ' ').title()
+    help_text = HELP_CONTENT[icon_key]
+    modal_key = f"modal_{icon_key}"
+    display_title = icon_key.replace('_', ' ').title()
     
-    # Create a button to toggle the modal
-    if st.button(f'ⓘ', key=f"btn_{modal_key}", help='Click for details', use_container_width=False):
-        toggle_modal(modal_key)
+    # Display title with inline icon button right next to it
+    col1, col2 = st.columns([0.95, 0.05])
+    with col1:
+        st.subheader(title_text)
+    with col2:
+        if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
+            toggle_modal(modal_key)
     
-    # Render the modal if it's open
+    # Render modal overlay
     render_modal_overlay(modal_key, display_title, help_text)
 
 def show_info_icon(key, title=None):
@@ -646,7 +644,6 @@ def show_info_icon(key, title=None):
     help_text = HELP_CONTENT[key]
     modal_key = f"modal_{key}"
     display_title = title or key.replace('_', ' ').title()
-    
     col_icon, _ = st.columns([0.05, 0.95])
     with col_icon:
         if st.button('ⓘ', key=f"btn_{modal_key}", help='Click for details'):
@@ -834,11 +831,7 @@ with tab1:
     period_opts = {'Past 12M': None, 'Since 2015': '2015-01-01', 'Since 2020': '2020-01-01', 'Since 2025': '2025-01-01'}
     
     # U.S. Major Indices Section with Info Icon
-    col_title, col_info = st.columns([0.92, 0.08])
-    with col_title:
-        st.subheader("U.S. Major Indices")
-    with col_info:
-        show_info_icon_inline('us_major_indices', 'U.S. Major Indices')
+    show_section_title_with_icon("U.S. Major Indices", 'us_major_indices')
     
     hdr_l, hdr_r = st.columns(2)
     with hdr_l:
@@ -860,11 +853,7 @@ with tab1:
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
     with hdr_r:
         # Sector Positioning with Info Icon
-        col_sect_title, col_sect_info = st.columns([0.92, 0.08])
-        with col_sect_title:
-            st.subheader("Sector Positioning")
-        with col_sect_info:
-            show_info_icon_inline('sector_positioning', 'Sector Positioning')
+        show_section_title_with_icon("Sector Positioning", 'sector_positioning')
         
         rows = []
         for t, n in SECTORS.items():
@@ -927,11 +916,15 @@ with tab1:
                 fmt = {c: '{:+.2f}' for c in ['1D', '5D', '1M', '12M', 'Flow Z', 'Composite'] if c in d.columns}
                 return s.format(fmt, na_rep='---')
             
-            col_top_title, col_top_info = st.columns([0.9, 0.1])
+            col_top_title, col_top_info = st.columns([0.95, 0.05])
             with col_top_title:
                 st.markdown('**Top 3 by Composite**')
             with col_top_info:
-                show_info_icon_inline('top_bottom_composite', 'Top & Bottom 3 by Composite')
+                init_modal_state()
+                modal_key = "modal_top_bottom_composite"
+                if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
+                    toggle_modal(modal_key)
+                render_modal_overlay(modal_key, 'Top & Bottom 3 by Composite', HELP_CONTENT['top_bottom_composite'])
             
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
             st.dataframe(_sty(t3), hide_index=True, use_container_width=True, height=140)
@@ -944,11 +937,7 @@ with tab1:
     st.divider()
     
     # Benchmark Price Action with Info Icon
-    col_bpa_title, col_bpa_info = st.columns([0.92, 0.08])
-    with col_bpa_title:
-        st.subheader('Benchmark Price Action')
-    with col_bpa_info:
-        show_info_icon_inline('benchmark_price_action', 'Benchmark Price Action')
+    show_section_title_with_icon('Benchmark Price Action', 'benchmark_price_action')
     
     st.caption('Interactive instructions: hover for OHLC details and use the dropdown to change the viewing window. Takeaway: this chart shows short-term trend structure, reversals, and volatility in SPY.')
     spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
@@ -966,11 +955,7 @@ with tab1:
         st.info('SPY candlestick data unavailable.')
     
     # Daily Positioning Feed with Info Icon
-    col_dpf_title, col_dpf_info = st.columns([0.92, 0.08])
-    with col_dpf_title:
-        st.subheader('Daily Positioning Feed')
-    with col_dpf_info:
-        show_info_icon_inline('daily_positioning', 'Daily Positioning Feed')
+    show_section_title_with_icon('Daily Positioning Feed', 'daily_positioning')
     
     st.caption('Interactive instructions: use the regime window selector to compare recent shifts across 3M, 6M, and 12M horizons. Takeaway: these four charts summarize whether leadership is broad or narrow, defensive or cyclical, and whether trading activity is unusually elevated.')
     regime_window = st.radio('Regime window', ['3M', '6M', '12M'], horizontal=True, key='regime_window', index=2)
@@ -1053,11 +1038,7 @@ with tab1:
     st.divider()
     
     # Relative Performance with Info Icon
-    col_rp_title, col_rp_info = st.columns([0.92, 0.08])
-    with col_rp_title:
-        st.subheader('Relative Performance')
-    with col_rp_info:
-        show_info_icon_inline('relative_performance', 'Relative Performance')
+    show_section_title_with_icon('Relative Performance', 'relative_performance')
     
     pf = st.radio('Period', list(period_opts.keys()), horizontal=True, key='pf')
     base = period_opts[pf] or (prices.index.max() - pd.DateOffset(months=12)).strftime('%Y-%m-%d')
@@ -1220,11 +1201,7 @@ with tab2:
     st.divider()
     
     # Yield Curve Section with Info Icon
-    col_yc_title, col_yc_info = st.columns([0.92, 0.08])
-    with col_yc_title:
-        st.subheader('Yield Curve & Treasury Rates')
-    with col_yc_info:
-        show_info_icon_inline('yield_curve', 'Yield Curve')
+    show_section_title_with_icon('Yield Curve & Treasury Rates', 'yield_curve')
     
     rp = st.radio('Period', ['1Y', '3Y', '5Y', '10Y', 'Full'], horizontal=True, key='rp')
     rmons = {'1Y': 12, '3Y': 36, '5Y': 60, '10Y': 120, 'Full': None}[rp]
@@ -1248,11 +1225,7 @@ with tab2:
         st.plotly_chart(fig, use_container_width=True, key='fig_yields', config=PCFG)
     
     # Yield Spreads, Real Yields, and Credit Spreads Section with Info Icon
-    col_spread_title, col_spread_info = st.columns([0.92, 0.08])
-    with col_spread_title:
-        st.subheader('Market Structure: Spreads & Credit')
-    with col_spread_info:
-        show_info_icon_inline('credit_spreads', 'Credit Spreads')
+    show_section_title_with_icon('Market Structure: Spreads & Credit', 'credit_spreads')
     
     r2a, r2b, r2c = st.columns(3)
     with r2a:
@@ -1357,11 +1330,15 @@ with tab2:
 with tab3:
     cl, cr3 = st.columns([3, 1])
     with cl:
-        col_ur_title, col_ur_info = st.columns([0.92, 0.08])
+        col_ur_title, col_ur_info = st.columns([0.95, 0.05])
         with col_ur_title:
             st.subheader('Upcoming Releases')
         with col_ur_info:
-            show_info_icon_inline('macro_releases', 'Macro Releases')
+            init_modal_state()
+            modal_key = "modal_macro_releases"
+            if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
+                toggle_modal(modal_key)
+            render_modal_overlay(modal_key, 'Macro Releases', HELP_CONTENT['macro_releases'])
         
         st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
         with st.spinner('Loading...'):
@@ -1371,11 +1348,15 @@ with tab3:
                 st.markdown(SRC_FRED, unsafe_allow_html=True)
         st.divider()
         
-        col_rc_title, col_rc_info = st.columns([0.92, 0.08])
+        col_rc_title, col_rc_info = st.columns([0.95, 0.05])
         with col_rc_title:
             st.subheader('Release Calendar')
         with col_rc_info:
-            show_info_icon_inline('fomc_calendar', 'Release Calendar')
+            init_modal_state()
+            modal_key = "modal_fomc_calendar"
+            if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
+                toggle_modal(modal_key)
+            render_modal_overlay(modal_key, 'Release Calendar', HELP_CONTENT['fomc_calendar'])
         
         st.caption('Interactive instructions: scroll through the calendar and use the color cues to distinguish past, present, and upcoming events. Takeaway: this gives timing context for when major macro catalysts may affect the market.')
         with st.spinner('Loading calendar...'):
