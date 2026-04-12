@@ -695,7 +695,7 @@ with tab1:
                     ix = (s / s.iloc[0] - 1) * 100
                     fig_idx.add_trace(go.Scatter(x=ix.index, y=np.round(ix.values, 2), name=n, mode='lines', line=dict(color=idx_colors.get(t, '#999'), width=2.5), customdata=np.round(s.values, 2), hovertemplate=f'<b>{n}</b><br>Date: %{{x|%b %d, %Y}}<br>Return: %{{y:+.2f}}%<br>Level: %{{customdata:,.2f}}<extra></extra>'))
         fig_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
-        fig_idx.update_layout(title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'), template='plotly_white', height=220, yaxis_title='Return (%)', margin=dict(b=60, t=40, l=50, r=30), legend=dict(orientation='h', yanchor='top', y=-0.35, x=0.5, xanchor='center', font=dict(size=11)), dragmode=False, font=dict(size=11))
+        fig_idx.update_layout(title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'), template='plotly_white', height=420, yaxis_title='Return (%)', margin=dict(b=60, t=40, l=50, r=30), legend=dict(orientation='h', yanchor='top', y=-0.35, x=0.5, xanchor='center', font=dict(size=11)), dragmode=False, font=dict(size=11))
         add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
     with hdr_r:
