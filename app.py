@@ -546,8 +546,8 @@ def render_modal_overlay(modal_key, title, content):
 
 def show_section_title_with_icon(title_text, icon_key):
     """
-    Display a section title with "about" text in italics next to it.
-    Hovering shows a CSS-based tooltip with help text.
+    Display a section title with "i" text in italics next to it.
+    Hovering shows a native browser tooltip with help text.
     
     Args:
         title_text: The title to display
@@ -558,71 +558,11 @@ def show_section_title_with_icon(title_text, icon_key):
         return
     
     help_text = HELP_CONTENT[icon_key]
-    # Escape quotes and newlines for HTML
-    safe_help = help_text.replace('"', '&quot;').replace('\n', ' ')
+    # Escape quotes for HTML
+    safe_help = help_text.replace('"', '&quot;')
     
-    # Create HTML with CSS tooltip on hover
-    title_html = f"""
-    <style>
-        .title-about-wrapper {{
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-            position: relative;
-        }}
-        .title-about {{
-            font-style: italic;
-            color: #666;
-            font-size: 0.85rem;
-            cursor: help;
-            border-bottom: 1px dotted #999;
-            position: relative;
-            display: inline-block;
-        }}
-        .title-about:hover {{
-            color: #333;
-        }}
-        .title-about .tooltip {{
-            visibility: hidden;
-            background-color: #333;
-            color: #fff;
-            text-align: left;
-            padding: 8px 12px;
-            border-radius: 4px;
-            position: absolute;
-            z-index: 1000;
-            bottom: 125%;
-            left: 0;
-            white-space: normal;
-            width: 280px;
-            font-size: 0.8rem;
-            font-style: normal;
-            line-height: 1.4;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }}
-        .title-about:hover .tooltip {{
-            visibility: visible;
-            opacity: 1;
-        }}
-        .title-about .tooltip::after {{
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 8px;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #333 transparent transparent transparent;
-        }}
-    </style>
-    <div class="title-about-wrapper">
-        <h3 style="margin: 0; font-size: 1.3rem;">{title_text}</h3>
-        <span class="title-about">i<div class="tooltip">{safe_help}</div></span>
-    </div>
-    """
+    # Simple HTML with native title tooltip
+    title_html = f'<h3 style="margin: 0; font-size: 1.3rem;">{title_text} <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="{safe_help}">i</span></h3>'
     st.markdown(title_html, unsafe_allow_html=True)
 
 
@@ -1341,12 +1281,12 @@ with tab3:
         # Add tooltips for key metrics
         st.markdown('''
         <div style="font-size: 0.8rem; color: #666; margin: 10px 0; line-height: 1.6;">
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['cpi'].replace('"', '&quot;') + '''">CPI YoY</span> · 
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_cpi'].replace('"', '&quot;') + '''">Core CPI YoY</span> · 
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['pce'].replace('"', '&quot;') + '''">PCE YoY</span> · 
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_pce'].replace('"', '&quot;') + '''">Core PCE YoY</span> · 
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['dual_mandate'].replace('"', '&quot;') + '''">Fed Funds & Unemployment</span> · 
-            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['real_gdp'].replace('"', '&quot;') + '''">Real GDP Growth</span>
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['cpi'].replace('"', '&quot;') + '''">CPI YoY</span> · 
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_cpi'].replace('"', '&quot;') + '''">Core CPI YoY</span> · 
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['pce'].replace('"', '&quot;') + '''">PCE YoY</span> · 
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_pce'].replace('"', '&quot;') + '''">Core PCE YoY</span> · 
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['dual_mandate'].replace('"', '&quot;') + '''">Fed Funds & Unemployment</span> · 
+            <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['real_gdp'].replace('"', '&quot;') + '''">Real GDP Growth</span>
         </div>
         ''', unsafe_allow_html=True)
         with st.spinner('Loading...'):
