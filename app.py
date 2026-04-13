@@ -1041,14 +1041,30 @@ with tab1:
             fig.update_layout(title=chart_title(f'{gl} Rolling 6M Alpha', 'Compounded 126-day relative return'), template='plotly_white', height=380, margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False)
             add_src(fig, -0.22)
             st.plotly_chart(fig, use_container_width=True, key=f'alpha_{ks}', config=PCFG)
-    st.markdown('#### Factors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.markdown('#### Factors')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(FACTORS, 'Factor', base, 'factors')
-    st.markdown('#### Cyclical-Tilt Sectors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['cyclical_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.markdown('#### Cyclical-Tilt Sectors')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['cyclical_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(SECTORS_CYCLICAL, 'Cyclical-Tilt', base, 'cyclical')
-    st.markdown('#### Defensive-Tilt Sectors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['defensive_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.markdown('#### Defensive-Tilt Sectors')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['defensive_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(SECTORS_DEFENSIVE, 'Defensive-Tilt', base, 'defensive')
     st.divider()
-    st.markdown('### Individual ETF -- Flow & Price <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['individual_etf_flow'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.subheader('Individual ETF -- Flow & Price')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['individual_etf_flow'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: use the chart window selector to switch between 3M, 6M, and 1Y views, then hover over each chart for values. Takeaway: rising prices with positive flow bars suggest stronger confirmation, while price gains with negative flows may indicate weaker participation.')
     cwopt = st.radio('Chart window', ['3M', '6M', '1Y'], horizontal=True, key='etf_cw', index=1)
     cbd = {'3M': 63, '6M': 126, '1Y': 252}[cwopt]
@@ -1080,14 +1096,22 @@ with tab1:
         fig.update_yaxes(title_text='Flow Z', secondary_y=True, range=[-3.5, 3.5], dtick=1, showgrid=False)
         add_src(fig, -0.22)
         return fig
-    st.markdown('#### Sector ETFs <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.markdown('#### Sector ETFs')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     sc = st.columns(3)
     for i, (t, n) in enumerate(SECTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
         if f:
             with sc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
-    st.markdown('#### Factor ETFs <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor_etfs'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.markdown('#### Factor ETFs')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor_etfs'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     fc = st.columns(3)
     for i, (t, n) in enumerate(FACTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
@@ -1095,7 +1119,11 @@ with tab1:
             with fc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
     st.divider()
-    st.markdown('### Altair Views <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['altair_views'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.subheader('Altair Views')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['altair_views'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: hover to compare sectors and macro series more quickly than in the larger charts. Takeaway: these compressed views help identify short-term winners, laggards, and macro relationships at a glance.')
     alt_left, alt_right = st.columns(2)
     with alt_left:
@@ -1135,7 +1163,11 @@ with tab1:
         except Exception:
             st.info('Altair macro chart unavailable.')
     st.divider()
-    st.markdown('### Sector ETF Holdings & Daily Attribution <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector_holdings'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
+        st.subheader('Sector ETF Holdings & Daily Attribution')
+    with col_btn:
+        st.markdown('<span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector_holdings'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: expand any sector ETF to inspect the holdings table. Takeaway: this section shows which stocks are driving daily ETF performance and whether sector moves are concentrated in a few names or spread more broadly.')
     ec = st.columns(2)
     for i, (t, n) in enumerate(SECTORS.items()):
@@ -1305,6 +1337,18 @@ with tab3:
         show_section_title_with_icon('Upcoming Releases', 'macro_releases')
         
         st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
+        
+        # Add tooltips for key metrics
+        st.markdown('''
+        <div style="font-size: 0.8rem; color: #666; margin: 10px 0; line-height: 1.6;">
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['cpi'].replace('"', '&quot;') + '''">CPI YoY</span> · 
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_cpi'].replace('"', '&quot;') + '''">Core CPI YoY</span> · 
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['pce'].replace('"', '&quot;') + '''">PCE YoY</span> · 
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['core_pce'].replace('"', '&quot;') + '''">Core PCE YoY</span> · 
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['dual_mandate'].replace('"', '&quot;') + '''">Fed Funds & Unemployment</span> · 
+            <span style="font-style: italic; cursor: help; border-bottom: 1px dotted #999;" title="''' + HELP_CONTENT['real_gdp'].replace('"', '&quot;') + '''">Real GDP Growth</span>
+        </div>
+        ''', unsafe_allow_html=True)
         with st.spinner('Loading...'):
             snap = fetch_release_snapshot()
             if not snap.empty:
