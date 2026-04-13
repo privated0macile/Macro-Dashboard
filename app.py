@@ -521,103 +521,51 @@ HELP_CONTENT = {
 
 def init_modal_state():
     """Initialize session state for modals."""
-    if 'open_modals' not in st.session_state:
-        st.session_state.open_modals = {}
+    pass
 
 def toggle_modal(modal_key):
     """Toggle modal open/closed state."""
-    if modal_key not in st.session_state.open_modals:
-        st.session_state.open_modals[modal_key] = False
-    st.session_state.open_modals[modal_key] = not st.session_state.open_modals[modal_key]
+    pass
 
 def render_modal_overlay(modal_key, title, content):
-    """Render a clickable modal overlay with close functionality."""
-    init_modal_state()
-    
-    if not st.session_state.open_modals.get(modal_key, False):
-        return
-    
-    # Create close button (hidden from view but clickable)
-    col1, col2, col3 = st.columns([1, 1, 0.15])
-    with col3:
-        if st.button('✕', key=f"close_{modal_key}"):
-            toggle_modal(modal_key)
-    
-    # HTML/CSS for modal overlay
-    modal_html = f"""
-    <style>
-        .modal-overlay-{modal_key} {{
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }}
-        .modal-content-wrapper-{modal_key} {{
-            background: white;
-            border-radius: 8px;
-            padding: 25px;
-            max-width: 550px;
-            width: 90%;
-            max-height: 75vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }}
-        .modal-title-{modal_key} {{
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 15px;
-            color: #1f1f1f;
-        }}
-        .modal-body-{modal_key} {{
-            font-size: 0.9rem;
-            line-height: 1.6;
-            color: #555;
-        }}
-    </style>
-    <div class=\"modal-overlay-{modal_key}\">
-        <div class=\"modal-content-wrapper-{modal_key}\">
-            <div class=\"modal-title-{modal_key}\">ℹ️ {title}</div>
-            <div class=\"modal-body-{modal_key}\">{content}</div>
-        </div>
-    </div>
-    """
-    
-    st.markdown(modal_html, unsafe_allow_html=True)
+    """Render a tooltip on hover - no modal overlay."""
+    pass
 
 def show_section_title_with_icon(title_text, icon_key):
     """
-    Display a section title with info icon button positioned right next to it.
+    Display a section title with "about" text in italics next to it.
+    Hovering shows a subtle tooltip with help text.
     
     Args:
         title_text: The title to display
         icon_key: Key for HELP_CONTENT
     """
-    init_modal_state()
-    
     if icon_key not in HELP_CONTENT:
         st.subheader(title_text)
         return
     
     help_text = HELP_CONTENT[icon_key]
-    modal_key = f"modal_{icon_key}"
-    display_title = icon_key.replace('_', ' ').title()
     
-    # Display title and info button side by side
-    col_title, col_btn = st.columns([0.92, 0.08])
-    with col_title:
-        st.subheader(title_text)
-    with col_btn:
-        if st.button('ⓘ', key=f"btn_{modal_key}", help='Information'):
-            toggle_modal(modal_key)
-    
-    # Render modal overlay
-    render_modal_overlay(modal_key, display_title, help_text)
+    # Create HTML with title attribute for hover tooltip
+    title_html = f"""
+    <style>
+        .title-about {{
+            font-style: italic;
+            color: #666;
+            font-size: 0.85rem;
+            cursor: help;
+            border-bottom: 1px dotted #999;
+        }}
+        .title-about:hover {{
+            color: #333;
+        }}
+    </style>
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+        <h3 style="margin: 0; font-size: 1.3rem;">{title_text}</h3>
+        <span class="title-about" title="{help_text.replace(chr(34), '&quot;')}">about</span>
+    </div>
+    """
+    st.markdown(title_html, unsafe_allow_html=True)
 
 
 st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-items:baseline">\n    <h1 style="margin:0">Macro Dashboard</h1>\n    <span style="color:#888;font-size:0.85rem">\n        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}\n        &nbsp;/&nbsp; Data: FRED / Yahoo Finance\n    </span>\n</div>\n""", unsafe_allow_html=True)
@@ -888,13 +836,9 @@ with tab1:
             
             col_top_title, col_top_info = st.columns([0.95, 0.05])
             with col_top_title:
-                st.markdown('**Top 3 by Composite**')
+                st.markdown('**Top 3 by Composite** <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['top_bottom_composite'].replace('"', '&quot;') + '">about</span>', unsafe_allow_html=True)
             with col_top_info:
-                init_modal_state()
-                modal_key = "modal_top_bottom_composite"
-                if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
-                    toggle_modal(modal_key)
-                render_modal_overlay(modal_key, 'Top & Bottom 3 by Composite', HELP_CONTENT['top_bottom_composite'])
+                pass
             
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
             st.dataframe(_sty(t3), hide_index=True, use_container_width=True, height=140)
@@ -1300,15 +1244,7 @@ with tab2:
 with tab3:
     cl, cr3 = st.columns([3, 1])
     with cl:
-        col_ur_title, col_ur_info = st.columns([0.95, 0.05])
-        with col_ur_title:
-            st.subheader('Upcoming Releases')
-        with col_ur_info:
-            init_modal_state()
-            modal_key = "modal_macro_releases"
-            if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
-                toggle_modal(modal_key)
-            render_modal_overlay(modal_key, 'Macro Releases', HELP_CONTENT['macro_releases'])
+        show_section_title_with_icon('Upcoming Releases', 'macro_releases')
         
         st.caption('Interactive instructions: scroll the table to compare recent and upcoming releases. Takeaway: this section highlights the latest macro prints and their previous values so the user can see where economic momentum is accelerating or slowing.')
         with st.spinner('Loading...'):
@@ -1318,15 +1254,7 @@ with tab3:
                 st.markdown(SRC_FRED, unsafe_allow_html=True)
         st.divider()
         
-        col_rc_title, col_rc_info = st.columns([0.95, 0.05])
-        with col_rc_title:
-            st.subheader('Release Calendar')
-        with col_rc_info:
-            init_modal_state()
-            modal_key = "modal_fomc_calendar"
-            if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
-                toggle_modal(modal_key)
-            render_modal_overlay(modal_key, 'Release Calendar', HELP_CONTENT['fomc_calendar'])
+        show_section_title_with_icon('Release Calendar', 'fomc_calendar')
         
         st.caption('Interactive instructions: scroll through the calendar and use the color cues to distinguish past, present, and upcoming events. Takeaway: this gives timing context for when major macro catalysts may affect the market.')
         with st.spinner('Loading calendar...'):
