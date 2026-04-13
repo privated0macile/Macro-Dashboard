@@ -531,13 +531,19 @@ def toggle_modal(modal_key):
     st.session_state.open_modals[modal_key] = not st.session_state.open_modals[modal_key]
 
 def render_modal_overlay(modal_key, title, content):
-    """Render a clickable modal overlay - click anywhere to close."""
+    """Render a clickable modal overlay with close functionality."""
     init_modal_state()
     
     if not st.session_state.open_modals.get(modal_key, False):
         return
     
-    # HTML/CSS for modal - clicking overlay background closes it
+    # Create close button (hidden from view but clickable)
+    col1, col2, col3 = st.columns([1, 1, 0.15])
+    with col3:
+        if st.button('✕', key=f"close_{modal_key}"):
+            toggle_modal(modal_key)
+    
+    # HTML/CSS for modal overlay
     modal_html = f"""
     <style>
         .modal-overlay-{modal_key} {{
@@ -551,47 +557,33 @@ def render_modal_overlay(modal_key, title, content):
             align-items: center;
             justify-content: center;
             z-index: 9999;
-            padding: 20px;
-            box-sizing: border-box;
         }}
-        .modal-content-{modal_key} {{
+        .modal-content-wrapper-{modal_key} {{
             background: white;
-            border-radius: 12px;
-            padding: 30px;
-            max-width: 500px;
-            width: 100%;
-            max-height: 80vh;
+            border-radius: 8px;
+            padding: 25px;
+            max-width: 550px;
+            width: 90%;
+            max-height: 75vh;
             overflow-y: auto;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-            pointer-events: all;
-        }}
-        .modal-header-{modal_key} {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #e6e6e6;
-            padding-bottom: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         }}
         .modal-title-{modal_key} {{
-            margin: 0;
-            font-size: 1.3rem;
-            color: #333;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #1f1f1f;
         }}
         .modal-body-{modal_key} {{
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             line-height: 1.6;
             color: #555;
         }}
     </style>
-    <div class="modal-overlay-{modal_key}" onclick="document.querySelector('.modal-trigger-{modal_key}')?.click(); event.stopPropagation();">
-        <div class="modal-content-{modal_key}" onclick="event.stopPropagation();">
-            <div class="modal-header-{modal_key}">
-                <h2 class="modal-title-{modal_key}">ℹ️ {title}</h2>
-            </div>
-            <div class="modal-body-{modal_key}">
-                {content}
-            </div>
+    <div class=\"modal-overlay-{modal_key}\">
+        <div class=\"modal-content-wrapper-{modal_key}\">
+            <div class=\"modal-title-{modal_key}\">ℹ️ {title}</div>
+            <div class=\"modal-body-{modal_key}\">{content}</div>
         </div>
     </div>
     """
@@ -600,8 +592,7 @@ def render_modal_overlay(modal_key, title, content):
 
 def show_section_title_with_icon(title_text, icon_key):
     """
-    Display a section title with inline info icon using custom HTML.
-    The icon appears right next to the title text.
+    Display a section title with info icon button positioned right next to it.
     
     Args:
         title_text: The title to display
@@ -617,39 +608,18 @@ def show_section_title_with_icon(title_text, icon_key):
     modal_key = f"modal_{icon_key}"
     display_title = icon_key.replace('_', ' ').title()
     
-    # Display title with inline icon button right next to it
-    col1, col2 = st.columns([0.95, 0.05])
-    with col1:
+    # Display title and info button side by side
+    col_title, col_btn = st.columns([0.92, 0.08])
+    with col_title:
         st.subheader(title_text)
-    with col2:
-        if st.button('ⓘ', key=f"btn_{modal_key}", help='Info', use_container_width=True):
+    with col_btn:
+        if st.button('ⓘ', key=f"btn_{modal_key}", help='Information'):
             toggle_modal(modal_key)
     
     # Render modal overlay
     render_modal_overlay(modal_key, display_title, help_text)
 
-def show_info_icon(key, title=None):
-    """
-    Display an info icon (ⓘ) that opens a modal overlay with help text.
-    
-    Args:
-        key: identifier in HELP_CONTENT dict (e.g., 'us_major_indices')
-        title: optional custom title for the modal (defaults to key name)
-    """
-    init_modal_state()
-    
-    if key not in HELP_CONTENT:
-        return
-    
-    help_text = HELP_CONTENT[key]
-    modal_key = f"modal_{key}"
-    display_title = title or key.replace('_', ' ').title()
-    col_icon, _ = st.columns([0.05, 0.95])
-    with col_icon:
-        if st.button('ⓘ', key=f"btn_{modal_key}", help='Click for details'):
-            toggle_modal(modal_key)
-    
-    render_modal_overlay(modal_key, display_title, help_text)
+
 st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-items:baseline">\n    <h1 style="margin:0">Macro Dashboard</h1>\n    <span style="color:#888;font-size:0.85rem">\n        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}\n        &nbsp;/&nbsp; Data: FRED / Yahoo Finance\n    </span>\n</div>\n""", unsafe_allow_html=True)
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
