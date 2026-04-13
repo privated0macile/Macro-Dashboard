@@ -607,7 +607,7 @@ def show_section_title_with_icon(title_text, icon_key):
     </style>
     <div class="title-about-wrapper">
         <h3 style="margin: 0; font-size: 1.3rem;">{title_text}</h3>
-        <span class="title-about">about<div class="tooltip">{safe_help}</div></span>
+        <span class="title-about">i<div class="tooltip">{safe_help}</div></span>
     </div>
     """
     st.markdown(title_html, unsafe_allow_html=True)
