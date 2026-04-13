@@ -88,7 +88,7 @@ CREDIT = {'BAMLH0A0HYM2': 'HY OAS', 'BAMLC0A0CM': 'IG OAS'}
 KEY_RELEASES = [('Nonfarm Payrolls', 'PAYEMS', '000s MoM', 'diff'), ('Unemployment Rate', 'UNRATE', '%', 'level'), ('CPI YoY', 'CPIAUCSL', '% YoY', 'yoy'), ('Core CPI YoY', 'CPILFESL', '% YoY', 'yoy'), ('PCE YoY', 'PCEPI', '% YoY', 'yoy'), ('Core PCE YoY', 'PCEPILFE', '% YoY', 'yoy'), ('GDP Growth QoQ Ann.', 'A191RL1Q225SBEA', '% Ann.', 'level'), ('Retail Sales MoM', 'RSAFS', '% MoM', 'mom'), ('Industrial Production', 'INDPRO', '% MoM', 'mom'), ('Fed Funds Rate', 'FEDFUNDS', '%', 'level'), ('10Y-2Y Spread', 'T10Y2Y', '%', 'level')]
 FOMC = {'2025': [('Jan 28-29', '2025-01-29', 'Hold (4.25-4.50%)'), ('Mar 18-19', '2025-03-19', 'Hold (4.25-4.50%)'), ('May 6-7', '2025-05-07', 'Hold (4.25-4.50%)'), ('Jun 17-18', '2025-06-18', 'Hold (4.25-4.50%)'), ('Jul 29-30', '2025-07-30', 'Hold (4.25-4.50%)'), ('Sep 16-17', '2025-09-17', 'Cut -25bp (4.00-4.25%)'), ('Oct 28-29', '2025-10-29', 'Cut -25bp (3.75-4.00%)'), ('Dec 9-10', '2025-12-10', 'Cut -25bp (3.50-3.75%)')], '2026': [('Jan 27-28', '2026-01-28', 'Hold (3.50-3.75%)'), ('Mar 17-18', '2026-03-18', ''), ('Apr 28-29', '2026-04-29', ''), ('Jun 9-10', '2026-06-10', ''), ('Jul 28-29', '2026-07-29', ''), ('Sep 15-16', '2026-09-16', ''), ('Oct 27-28', '2026-10-28', ''), ('Dec 8-9', '2026-12-09', '')]}
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_fred(sid, start=START):
     """Fetch a FRED series from the configured start date."""
     s = fred.get_series(sid, observation_start=start)
@@ -96,7 +96,7 @@ def fetch_fred(sid, start=START):
     return s.dropna()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_equity():
     """Fetch close and volume data for dashboard tickers from Yahoo Finance."""
     ht = [t for e in HOLDINGS.values() for t, _, _ in e]
@@ -138,7 +138,7 @@ def fetch_equity():
         volume_df = normalize_yf_panel(raw, "Volume")
         return close_df, volume_df
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_benchmark_ohlc(start=START, ticker=BENCH):
     """Fetch OHLCV history for a single benchmark ticker."""
     raw = yf.download(ticker, start=start, auto_adjust=True, progress=False, threads=True)
@@ -157,7 +157,7 @@ def fetch_benchmark_ohlc(start=START, ticker=BENCH):
             out[missing] = np.nan
     return out[['Open', 'High', 'Low', 'Close', 'Volume']].dropna(how='all')
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_release_snapshot():
     """Build the macro release snapshot table displayed on the calendar tab."""
     rows = []
@@ -200,7 +200,7 @@ def fetch_release_snapshot():
             continue
     return pd.DataFrame(rows)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=86400)
 def fetch_fred_calendar():
     """Fetch recent and upcoming FRED release dates."""
     today = datetime.today()
@@ -617,7 +617,7 @@ st.markdown(f"""\n<div style="display:flex;justify-content:space-between;align-i
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
   <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222">
-    <strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and is refreshed hourly from cached calls.
+    <strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and reflects the last trading day (updated daily from cached calls).
   </p>
   <p style="margin:0;font-size:0.85rem;color:#555">
     Use hover details and legend clicks to inspect each series. Radio buttons and dropdown menus allow you to change time windows and compare market behavior across multiple horizons.

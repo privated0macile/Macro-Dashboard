@@ -17,13 +17,13 @@ from constants import PCFG
 FRED_KEY = st.secrets['FRED_API_KEY']
 fred = fredapi.Fred(api_key=FRED_KEY)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_fred(sid, start=START):
     s = fred.get_series(sid, observation_start=start)
     s.index = pd.to_datetime(s.index)
     return s.dropna()
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_equity():
     ht = [t for e in HOLDINGS.values() for t, _, _ in e]
     tks = list(set(
@@ -47,7 +47,7 @@ def fetch_equity():
         volume_df = normalize_yf_panel(raw, 'Volume')
         return close_df, volume_df
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_benchmark_ohlc(start=START, ticker=BENCH):
     raw = yf.download(ticker, start=start, auto_adjust=True, progress=False, threads=True)
     if raw is None or len(raw) == 0:
@@ -65,7 +65,7 @@ def fetch_benchmark_ohlc(start=START, ticker=BENCH):
             out[missing] = pd.NA
     return out[['Open', 'High', 'Low', 'Close', 'Volume']].dropna(how='all')
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_release_snapshot():
     rows = []
     for name, sid, unit, calc in KEY_RELEASES:
@@ -106,7 +106,7 @@ def fetch_release_snapshot():
             continue
     return pd.DataFrame(rows)
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=86400)
 def fetch_fred_calendar():
     today = datetime.today()
     ps = (today - timedelta(days=35)).strftime('%Y-%m-%d')
