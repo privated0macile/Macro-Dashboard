@@ -517,6 +517,19 @@ HELP_CONTENT = {
     'credit_spreads': 'The gap between risky corporate bonds and safe U.S. Treasuries. Higher spreads = market is fearful. Lower spreads = market is confident. High-yield (junk bond) spreads are most sensitive to recession fears.',
     'macro_releases': 'Displays the most recent economic data (Nonfarm Payrolls, Unemployment, CPI, etc.) and compares it to the previous release. Green = better than previous; Red = worse than previous. The "Next Release" column tells you when new data is coming.',
     'fomc_calendar': 'Lists upcoming Federal Reserve decision dates and what the market expects. FOMC meetings occur 8 times per year. Policy changes at these meetings can move markets significantly.',
+    'factor': 'A factor is a systematic driver of returns across many stocks. Common factors include Value (cheap stocks), Momentum (winners), Quality (profitable companies), and Growth (expansion). Factor investing isolates these characteristics from broader market moves.',
+    'sector': 'A sector is a group of stocks sharing similar business characteristics (e.g., Tech, Healthcare, Financials, Energy). Sectors rotate in and out of favor based on economic conditions and investor sentiment.',
+    'cyclical_tilt': 'Cyclical sectors outperform during economic expansions when growth is strong. Examples: Industrials, Consumer Discretionary, Financials. These are sensitive to interest rates and economic cycles.',
+    'defensive_tilt': 'Defensive sectors hold up better during economic downturns. Examples: Utilities, Consumer Staples, Healthcare. These have steady demand and stable cash flows regardless of the economic cycle.',
+    'individual_etf_flow': 'Shows the flow (buying/selling pressure) and price movement of a single ETF over your chosen time window. Green bars = inflows, red = outflows. Rising price with strong inflows signals genuine demand; rising with poor inflows may indicate weakness.',
+    'factor_etfs': 'Factor ETFs isolate specific investment factors (Value, Momentum, Quality, Size, Growth) to help target systematic return drivers. These flex independently from broad market indices, useful for tactical positioning.',
+    'altair_views': 'Compressed heatmaps and line charts showing sector/factor performance (1M, 5D returns) and macro trends (10Y-2Y spread, Fed Funds, Unemployment) at a glance. Easier to spot patterns and correlations than large interactive charts.',
+    'cpi': 'Consumer Price Index (CPI) measures how much prices are rising for goods and services. CPI YoY compares this month to last year. High CPI signals inflation; lower CPI signals disinflation. The Fed watches this to set interest rates.',
+    'core_cpi': 'Core CPI excludes volatile food and energy prices to show underlying inflation trend. Often more stable than headline CPI and preferred by central banks for policy decisions.',
+    'pce': 'Personal Consumption Expenditures is the Fed\'s preferred inflation measure. PCE YoY compares current prices to a year ago. Lower PCE helps justify rate cuts; higher PCE keeps rates elevated.',
+    'core_pce': 'Core PCE excludes food and energy. Shows the true persistent inflation that policy-makers focus on.',
+    'dual_mandate': 'The Federal Reserve has two goals: keep inflation near 2% and maximize employment. When unemployment is high, the Fed cuts rates to create jobs. When inflation is high, the Fed raises rates to cool demand.',
+    'real_gdp': 'Real GDP Growth (QoQ Annualized) shows quarterly economic expansion rate adjusted for inflation. A 2-3% annualized rate is healthy. Above 4% signals strong growth; below 0% signals recession.',
 }
 
 def init_modal_state():
@@ -881,7 +894,7 @@ with tab1:
             
             col_top_title, col_top_info = st.columns([0.95, 0.05])
             with col_top_title:
-                st.markdown('**Top 3 by Composite** <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['top_bottom_composite'].replace('"', '&quot;') + '">about</span>', unsafe_allow_html=True)
+                st.markdown('**Top 3 by Composite**')
             with col_top_info:
                 pass
             
@@ -1028,14 +1041,14 @@ with tab1:
             fig.update_layout(title=chart_title(f'{gl} Rolling 6M Alpha', 'Compounded 126-day relative return'), template='plotly_white', height=380, margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False)
             add_src(fig, -0.22)
             st.plotly_chart(fig, use_container_width=True, key=f'alpha_{ks}', config=PCFG)
-    st.markdown('#### Factors')
+    st.markdown('#### Factors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(FACTORS, 'Factor', base, 'factors')
-    st.markdown('#### Cyclical-Tilt Sectors')
+    st.markdown('#### Cyclical-Tilt Sectors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['cyclical_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(SECTORS_CYCLICAL, 'Cyclical-Tilt', base, 'cyclical')
-    st.markdown('#### Defensive-Tilt Sectors')
+    st.markdown('#### Defensive-Tilt Sectors <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['defensive_tilt'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     _build_pair(SECTORS_DEFENSIVE, 'Defensive-Tilt', base, 'defensive')
     st.divider()
-    st.subheader('Individual ETF -- Flow & Price')
+    st.markdown('### Individual ETF -- Flow & Price <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['individual_etf_flow'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: use the chart window selector to switch between 3M, 6M, and 1Y views, then hover over each chart for values. Takeaway: rising prices with positive flow bars suggest stronger confirmation, while price gains with negative flows may indicate weaker participation.')
     cwopt = st.radio('Chart window', ['3M', '6M', '1Y'], horizontal=True, key='etf_cw', index=1)
     cbd = {'3M': 63, '6M': 126, '1Y': 252}[cwopt]
@@ -1067,14 +1080,14 @@ with tab1:
         fig.update_yaxes(title_text='Flow Z', secondary_y=True, range=[-3.5, 3.5], dtick=1, showgrid=False)
         add_src(fig, -0.22)
         return fig
-    st.markdown('#### Sector ETFs')
+    st.markdown('#### Sector ETFs <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     sc = st.columns(3)
     for i, (t, n) in enumerate(SECTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
         if f:
             with sc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
-    st.markdown('#### Factor ETFs')
+    st.markdown('#### Factor ETFs <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['factor_etfs'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     fc = st.columns(3)
     for i, (t, n) in enumerate(FACTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
@@ -1082,7 +1095,7 @@ with tab1:
             with fc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
     st.divider()
-    st.subheader('Altair Views')
+    st.markdown('### Altair Views <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['altair_views'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: hover to compare sectors and macro series more quickly than in the larger charts. Takeaway: these compressed views help identify short-term winners, laggards, and macro relationships at a glance.')
     alt_left, alt_right = st.columns(2)
     with alt_left:
@@ -1122,7 +1135,7 @@ with tab1:
         except Exception:
             st.info('Altair macro chart unavailable.')
     st.divider()
-    st.subheader('Sector ETF Holdings & Daily Attribution')
+    st.markdown('### Sector ETF Holdings & Daily Attribution <span style="font-style: italic; color: #666; font-size: 0.85rem; cursor: help; border-bottom: 1px dotted #999;" title="' + HELP_CONTENT['sector_holdings'].replace('"', '&quot;') + '">i</span>', unsafe_allow_html=True)
     st.caption('Interactive instructions: expand any sector ETF to inspect the holdings table. Takeaway: this section shows which stocks are driving daily ETF performance and whether sector moves are concentrated in a few names or spread more broadly.')
     ec = st.columns(2)
     for i, (t, n) in enumerate(SECTORS.items()):
