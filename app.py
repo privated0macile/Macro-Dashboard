@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import yfinance as yf
@@ -393,9 +394,15 @@ CM = dict(b=120, t=60, l=60, r=40)
 LEG = dict(orientation='h', yanchor='top', y=-0.25, x=0.5, xanchor='center', font=dict(size=11))
 PCFG = dict(displayModeBar=False, scrollZoom=False)
 DISCLAIMER = '*Disclaimer: This dashboard is for educational and informational purposes only. Nothing contained herein constitutes investment advice, a recommendation, or a solicitation to buy or sell any securities or financial instruments. The data presented may be delayed, incomplete, or inaccurate, and should not be relied upon for trading or investment decisions. Past performance is not indicative of future results. The authors and contributors assume no liability for any losses or damages arising from the use of this information. Consult a qualified financial advisor before making any investment decisions.*'
-SRC_BOTH = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED / Yahoo Finance</p>'
-SRC_FRED = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED</p>'
-SRC_YF = '<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: Yahoo Finance</p>'
+
+# Last trading day (previous business day)
+_today = pd.Timestamp.today().normalize()
+LAST_TRADE = (_today - pd.tseries.offsets.BDay(1))
+LAST_TRADE_STR = LAST_TRADE.strftime('%d %B, %Y')
+
+SRC_BOTH = f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}</p>'
+SRC_FRED = f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED, data as of {LAST_TRADE_STR}</p>'
+SRC_YF = f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: Yahoo Finance, data as of {LAST_TRADE_STR}</p>'
 ZSCORE_LOOKBACK = 252
 CHART_WINDOW = 63
 
@@ -522,7 +529,7 @@ FOMC = {
 
 # ── Data-fetching functions ────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_fred(sid, start=START):
     """Fetch a FRED series from the configured start date."""
     s = fred.get_series(sid, observation_start=start)
@@ -530,7 +537,7 @@ def fetch_fred(sid, start=START):
     return s.dropna()
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_equity():
     """Fetch close and volume data for dashboard tickers from Yahoo Finance."""
     ht = [t for e in HOLDINGS.values() for t, _, _ in e]
@@ -556,7 +563,7 @@ def fetch_equity():
         return close_df, volume_df
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_benchmark_ohlc(start=START, ticker=BENCH):
     """Fetch OHLCV history for a single benchmark ticker."""
     raw = yf.download(ticker, start=start, auto_adjust=True, progress=False, threads=True)
@@ -576,7 +583,7 @@ def fetch_benchmark_ohlc(start=START, ticker=BENCH):
     return out[['Open', 'High', 'Low', 'Close', 'Volume']].dropna(how='all')
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400)
 def fetch_release_snapshot():
     """Build the macro release snapshot table displayed on the calendar tab."""
     rows = []
@@ -629,7 +636,7 @@ def fetch_release_snapshot():
     return pd.DataFrame(rows)
 
 
-@st.cache_data(ttl=1800)
+@st.cache_data(ttl=86400)
 def fetch_fred_calendar():
     """Fetch recent and upcoming FRED release dates."""
     today = datetime.today()
@@ -730,7 +737,7 @@ def snap_color(row):
     return st_
 
 def add_src(fig, y=-0.25):
-    fig.add_annotation(text='Source: FRED / Yahoo Finance', xref='paper', yref='paper', x=1.0, y=y, showarrow=False, font=dict(size=10, color='#888888'), xanchor='right')
+    fig.add_annotation(text=f'Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}', xref='paper', yref='paper', x=1.0, y=y, showarrow=False, font=dict(size=10, color='#888888'), xanchor='right')
 
 def compute_volume_zscore(v, lb=ZSCORE_LOOKBACK):
     v = v.dropna()
@@ -924,20 +931,30 @@ st.markdown(f"""
 <div style="display:flex;justify-content:space-between;align-items:baseline">
     <h1 style="margin:0">Macro Dashboard</h1>
     <span style="color:#888;font-size:0.85rem">
-        Refreshed: {datetime.now().strftime('%b %d, %Y %H:%M')}
-        &nbsp;/&nbsp; Data: FRED / Yahoo Finance
+        Data as of {LAST_TRADE_STR}
+        &nbsp;/&nbsp; Source: FRED / Yahoo Finance
     </span>
 </div>
 """, unsafe_allow_html=True)
 
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
-  <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. Data scope begins {START} and is refreshed hourly from cached calls.</p>
+  <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. All data reflects the last trading day close ({LAST_TRADE_STR}) and is cached daily.</p>
   <p style="margin:0;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Every chart includes a short caption describing what it shows, why it matters, and the data source.</p>
 </div>
 """, unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs(['Introduction', 'Equities', 'Fixed Income & Macro', 'Calendar', 'Conclusion'])
+
+# Default to Equities tab on first load
+if 'tab_init' not in st.session_state:
+    st.session_state.tab_init = True
+    components.html("""
+    <script>
+        const tabs = window.parent.document.querySelectorAll('[data-baseweb="tab"]');
+        if (tabs.length > 1) tabs[1].click();
+    </script>
+    """, height=0)
 
 # ── TAB 0: Introduction ───────────────────────────────────────────────────
 with tab0:
