@@ -1110,7 +1110,7 @@ with tab1:
         fig_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
         fig_idx.update_layout(
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
-            template='plotly_white', height=380, yaxis_title='Return (%)',
+            template='plotly_white', height=460, yaxis_title='Return (%)',
             margin=dict(b=130, t=40, l=50, r=30),
             legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
@@ -1176,9 +1176,9 @@ with tab1:
             label_info('Sector Positioning by Composite', TIP_COMPOSITE)
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
             st.markdown('**Top 3 by Composite**')
-            st.dataframe(_sty(t3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=145)
+            st.dataframe(_sty(t3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=180)
             st.markdown('**Bottom 3 by Composite**')
-            st.dataframe(_sty(b3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=145)
+            st.dataframe(_sty(b3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=180)
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
@@ -1207,11 +1207,11 @@ with tab1:
         ))
         fig_spy.update_layout(
             title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
-            template='plotly_white', height=420, margin=dict(b=120, t=60, l=60, r=40),
+            template='plotly_white', height=440, margin=dict(b=140, t=60, l=60, r=40),
             legend=LEG, dragmode=False,
         )
         fig_spy.update_yaxes(title_text='Price ($)')
-        add_src(fig_spy, -0.35)
+        add_src(fig_spy, -0.42)
         st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
     else:
         st.info('SPY candlestick data unavailable.')
@@ -1241,9 +1241,9 @@ with tab1:
                     title=dict(text=f"<span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>", font=dict(size=12)),
                     template='plotly_white', height=380, yaxis_title='%-tile',
                     yaxis=dict(range=[0, 1], dtick=0.25),
-                    margin=dict(b=120, t=35, l=45, r=25), dragmode=False,
+                    margin=dict(b=80, t=35, l=45, r=25), dragmode=False,
                 )
-                add_src(fig, -0.40)
+                add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key='fig_rotation', config=PCFG)
             else:
                 st.info('Rotation ratio unavailable.')
@@ -1266,9 +1266,9 @@ with tab1:
                 fig.update_layout(
                     title=dict(text=f"<span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>", font=dict(size=12)),
                     template='plotly_white', height=380, yaxis_title='Indexed',
-                    margin=dict(b=120, t=35, l=45, r=25), dragmode=False,
+                    margin=dict(b=80, t=35, l=45, r=25), dragmode=False,
                 )
-                add_src(fig, -0.40)
+                add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key='fig_breadth', config=PCFG)
         except Exception:
             st.info('Breadth data unavailable.')
@@ -1290,9 +1290,9 @@ with tab1:
             fig.update_layout(
                 title=dict(text=f"<span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>", font=dict(size=12)),
                 template='plotly_white', height=380, yaxis_title='Ratio',
-                margin=dict(b=120, t=35, l=45, r=25), dragmode=False,
+                margin=dict(b=80, t=35, l=45, r=25), dragmode=False,
             )
-            add_src(fig, -0.40)
+            add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key='fig_cyc_def', config=PCFG)
         except Exception:
             st.info('Cyclical/Defensive unavailable.')
@@ -1317,9 +1317,9 @@ with tab1:
                 title=dict(text=f"<span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>", font=dict(size=12)),
                 template='plotly_white', height=380, yaxis_title='Z-Score',
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
-                margin=dict(b=120, t=35, l=45, r=25), bargap=0.15, dragmode=False,
+                margin=dict(b=80, t=35, l=45, r=25), bargap=0.15, dragmode=False,
             )
-            add_src(fig, -0.40)
+            add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key='fig_spy_vol', config=PCFG)
         except Exception:
             st.info('SPY volume unavailable.')
@@ -1460,7 +1460,7 @@ with tab1:
                     tooltip=['Sector:N', 'Ticker:N', 'Metric:N', alt.Tooltip('Value:Q', format='.2f')],
                 ).transform_fold(['1M Return', '5D Return'], as_=['Metric', 'Value']).properties(height=160)
                 st.altair_chart(heat, use_container_width=True)
-                st.markdown(SRC_BOTH, unsafe_allow_html=True)
+                st.markdown(f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:-0.5rem">Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}</p>', unsafe_allow_html=True)
             else:
                 st.info('Not enough sector data for the Altair heatmap.')
         except Exception:
@@ -1482,7 +1482,7 @@ with tab1:
                     tooltip=[alt.Tooltip('Date:T'), 'Series:N', alt.Tooltip('Value:Q', format='.2f')],
                 ).properties(height=220)
                 st.altair_chart(line, use_container_width=True)
-                st.markdown(SRC_FRED, unsafe_allow_html=True)
+                st.markdown(f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:-0.5rem">Source: FRED, data as of {LAST_TRADE_STR}</p>', unsafe_allow_html=True)
             else:
                 st.info('Not enough macro data for the Altair line chart.')
         except Exception:
