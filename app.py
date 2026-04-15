@@ -45,12 +45,10 @@ st.markdown("""
     .info-box {
         visibility: hidden;
         opacity: 0;
-        position: absolute;
+        position: fixed;
         z-index: 9999;
-        bottom: 130%;
-        left: 50%;
-        transform: translateX(-50%);
         width: 300px;
+        max-width: 90vw;
         padding: 10px 13px;
         background: #2b2b2b;
         color: #eee;
@@ -64,22 +62,30 @@ st.markdown("""
         transition: opacity 0.18s;
         pointer-events: none;
     }
-    .info-box::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #2b2b2b transparent transparent transparent;
-    }
     .info-tip:hover .info-box,
     .info-tip:focus .info-box {
         visibility: visible;
         opacity: 1;
     }
 </style>
+<script>
+document.addEventListener('mouseover', function(e) {
+    var tip = e.target.closest('.info-tip');
+    if (!tip) return;
+    var box = tip.querySelector('.info-box');
+    if (!box) return;
+    var rect = tip.getBoundingClientRect();
+    var bw = 300;
+    var left = rect.left + rect.width/2 - bw/2;
+    if (left < 8) left = 8;
+    if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
+    box.style.left = left + 'px';
+    box.style.top = (rect.top - box.offsetHeight - 8) + 'px';
+    if (rect.top - box.offsetHeight - 8 < 8) {
+        box.style.top = (rect.bottom + 8) + 'px';
+    }
+});
+</script>
 """, unsafe_allow_html=True)
 
 # ── Tooltip helpers ────────────────────────────────────────────────────────
@@ -105,9 +111,9 @@ def hdr(title, tip, tag="h3"):
     )
 
 def label_info(label, tip):
-    """Render a bold label with an info tooltip (for smaller inline labels)."""
+    """Render a label with an info tooltip, matching section header size."""
     st.markdown(
-        f'<span style="font-weight:600;font-size:0.95rem">{label}</span>{info(tip)}',
+        f'<h3 style="display:inline;vertical-align:middle;margin:0">{label}</h3>{info(tip)}',
         unsafe_allow_html=True,
     )
 
@@ -260,6 +266,28 @@ TIP_FOMC = (
     "whether to raise, lower, or hold interest rates. These decisions move every "
     "asset class. Past meetings show their outcomes; future dates show days remaining."
 )
+
+SECTOR_TIPS = {
+    'XLK': 'Info Tech: Apple, Microsoft, Nvidia, etc. Largest sector by weight. Sensitive to interest rates and growth expectations.',
+    'XLF': 'Financials: Banks, insurers, payment networks. Benefits from higher rates and steeper yield curves.',
+    'XLE': 'Energy: Oil majors, drillers, pipelines. Tied to oil/gas prices and global demand.',
+    'XLV': 'Healthcare: Pharma, biotech, insurers. Defensive -- demand is steady regardless of the economy.',
+    'XLI': 'Industrials: Aerospace, machinery, railroads. Cyclical -- rises with economic expansion and capex.',
+    'XLY': 'Consumer Discretionary: Amazon, Tesla, Home Depot. Spending on wants, not needs -- sensitive to consumer confidence.',
+    'XLP': 'Consumer Staples: Procter & Gamble, Costco, Coca-Cola. Essentials people buy in any economy. Defensive.',
+    'XLB': 'Materials: Chemicals, mining, steel. Tied to commodity prices and industrial demand.',
+    'XLU': 'Utilities: Electric, gas, water companies. Bond-like, dividend-heavy. Outperforms when rates fall.',
+    'XLRE': 'Real Estate: REITs -- warehouses, towers, malls. Sensitive to interest rates and property values.',
+    'XLC': 'Comm Services: Meta, Alphabet, Netflix, Disney. Mix of social media, streaming, and telecom.',
+}
+FACTOR_TIPS = {
+    'USMV': 'Min Vol: Stocks with the lowest historical volatility. Tends to outperform in choppy or falling markets.',
+    'MTUM': 'Momentum: Stocks that have been rising recently. Bets that winners keep winning in the short term.',
+    'QUAL': 'Quality: Companies with high ROE, low debt, stable earnings. Tends to hold up well in downturns.',
+    'SIZE': 'Size (Small-Cap): Smaller companies that may grow faster but carry more risk than large-caps.',
+    'VLUE': 'Value: Stocks trading at low price-to-earnings or price-to-book. Bets that cheap stocks will revert to fair value.',
+    'HDV': 'High Dividend Yield: Companies paying above-average dividends. Popular for income, tends to be defensive.',
+}
 
 # ── Config ─────────────────────────────────────────────────────────────────
 
@@ -849,7 +877,7 @@ with tab1:
         fig_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
         fig_idx.update_layout(
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
-            template='plotly_white', height=410, yaxis_title='Return (%)',
+            template='plotly_white', height=380, yaxis_title='Return (%)',
             margin=dict(b=80, t=40, l=50, r=30),
             legend=dict(orientation='h', yanchor='top', y=-0.22, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
@@ -914,13 +942,10 @@ with tab1:
 
             label_info('Sector Positioning by Composite', TIP_COMPOSITE)
             st.caption('Composite = (Flow Z + Signed Vol Z + Return Z) / 3 -- all 252-day rolling, clipped +/-3')
-            tbl_l, tbl_r = st.columns(2)
-            with tbl_l:
-                st.markdown('**Top 3 by Composite**')
-                st.dataframe(_sty(t3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=160)
-            with tbl_r:
-                st.markdown('**Bottom 3 by Composite**')
-                st.dataframe(_sty(b3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=160)
+            st.markdown('**Top 3 by Composite**')
+            st.dataframe(_sty(t3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=145)
+            st.markdown('**Bottom 3 by Composite**')
+            st.dataframe(_sty(b3.reset_index(drop=True)), hide_index=True, use_container_width=True, height=145)
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
@@ -1176,6 +1201,8 @@ with tab1:
         if f:
             with sc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
+                if t in SECTOR_TIPS:
+                    st.markdown(f'<div style="margin-top:-0.5rem">{info(SECTOR_TIPS[t])}</div>', unsafe_allow_html=True)
 
     st.markdown('#### Factor ETFs')
     fc = st.columns(3)
@@ -1184,6 +1211,8 @@ with tab1:
         if f:
             with fc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
+                if t in FACTOR_TIPS:
+                    st.markdown(f'<div style="margin-top:-0.5rem">{info(FACTOR_TIPS[t])}</div>', unsafe_allow_html=True)
 
     st.divider()
 
@@ -1339,9 +1368,12 @@ with tab2:
         except Exception:
             pass
         fig.update_layout(
-            title=chart_title('Curve Spreads', 'Below 0 = inverted / shaded = contiguous inversion'),
+            title=dict(
+                text="<b>Curve Spreads</b><br><span style='font-size:11px;color:#888'>Below 0 = inverted / shaded = contiguous inversion</span>",
+                font=dict(size=14),
+            ),
             template='plotly_white', height=340, yaxis_title='Spread (%)',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=60, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_spreads', config=PCFG)
