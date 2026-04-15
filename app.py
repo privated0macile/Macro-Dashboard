@@ -113,6 +113,16 @@ def label_info(label, tip):
         unsafe_allow_html=True,
     )
 
+def chart_label(title, tip):
+    """Render a chart-level title with inline tooltip above a Plotly/Altair chart."""
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:5px">'
+        f'<span style="font-weight:700;font-size:0.9rem">{title}</span>'
+        f'{info(tip)}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
 # ── Tooltip text constants ─────────────────────────────────────────────────
 
 TIP_INDICES = (
@@ -995,22 +1005,19 @@ with tab1:
                 rv = rr_pct.iloc[-1]
                 rl = 'Sector rotation' if rv > 0.75 else 'Stock dispersion' if rv < 0.25 else 'Balanced'
                 rt = rr_pct[rr_pct.index >= regime_cutoff]
+                chart_label(f'Macro vs Micro -- {rv:.2f} ({rl})', TIP_MACRO_MICRO)
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=rt.index, y=rt.values, mode='lines', line=dict(color='#1f77b4', width=2), showlegend=False))
                 fig.add_hline(y=0.5, line_dash='dash', line_color='gray')
                 fig.add_hrect(y0=0.25, y1=0.75, fillcolor='gray', opacity=0.08, line_width=0)
                 fig.update_layout(
-                    title=dict(
-                        text=f"<b>Macro vs Micro</b> -- {rv:.2f} ({rl})<br><span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>",
-                        font=dict(size=12),
-                    ),
-                    template='plotly_white', height=380, yaxis_title='%-tile',
+                    title=dict(text=f"<span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>", font=dict(size=12)),
+                    template='plotly_white', height=350, yaxis_title='%-tile',
                     yaxis=dict(range=[0, 1], dtick=0.25),
-                    margin=dict(b=70, t=65, l=45, r=25), dragmode=False,
+                    margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
                 )
                 add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key='fig_rotation', config=PCFG)
-                st.markdown(f'<div style="margin-top:-0.5rem">{info(TIP_MACRO_MICRO)}</div>', unsafe_allow_html=True)
             else:
                 st.info('Rotation ratio unavailable.')
         except Exception:
@@ -1025,20 +1032,17 @@ with tab1:
                 bi = bt / bt.iloc[0]
                 bn = bi.iloc[-1]
                 bl = 'Broad' if bn > 1.005 else 'Concentrated' if bn < 0.995 else 'Neutral'
+                chart_label(f'Breadth -- {bn:.4f} ({bl})', TIP_BREADTH)
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=bi.index, y=bi.values, mode='lines', line=dict(color='#ff7f0e', width=2), showlegend=False))
                 fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
                 fig.update_layout(
-                    title=dict(
-                        text=f"<b>Breadth</b> -- {bn:.4f} ({bl})<br><span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>",
-                        font=dict(size=12),
-                    ),
-                    template='plotly_white', height=380, yaxis_title='Indexed',
-                    margin=dict(b=70, t=65, l=45, r=25), dragmode=False,
+                    title=dict(text=f"<span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>", font=dict(size=12)),
+                    template='plotly_white', height=350, yaxis_title='Indexed',
+                    margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
                 )
                 add_src(fig, -0.25)
                 st.plotly_chart(fig, use_container_width=True, key='fig_breadth', config=PCFG)
-                st.markdown(f'<div style="margin-top:-0.5rem">{info(TIP_BREADTH)}</div>', unsafe_allow_html=True)
         except Exception:
             st.info('Breadth data unavailable.')
 
@@ -1052,20 +1056,17 @@ with tab1:
             ri2 = rt2 / rt2.iloc[0]
             cn = ri2.iloc[-1]
             cl = 'Risk-on' if cn > 1.005 else 'Risk-off' if cn < 0.995 else 'Neutral'
+            chart_label(f'Cyclical / Defensive -- {cn:.4f} ({cl})', TIP_CYC_DEF)
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=ri2.index, y=ri2.values, mode='lines', line=dict(color='#2ca02c', width=2), showlegend=False))
             fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
             fig.update_layout(
-                title=dict(
-                    text=f"<b>Cyclical / Defensive</b> -- {cn:.4f} ({cl})<br><span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>",
-                    font=dict(size=12),
-                ),
-                template='plotly_white', height=380, yaxis_title='Ratio',
-                margin=dict(b=70, t=65, l=45, r=25), dragmode=False,
+                title=dict(text=f"<span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>", font=dict(size=12)),
+                template='plotly_white', height=350, yaxis_title='Ratio',
+                margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
             )
             add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key='fig_cyc_def', config=PCFG)
-            st.markdown(f'<div style="margin-top:-0.5rem">{info(TIP_CYC_DEF)}</div>', unsafe_allow_html=True)
         except Exception:
             st.info('Cyclical/Defensive unavailable.')
 
@@ -1079,23 +1080,20 @@ with tab1:
             sz = szf[szf.index >= c3m]
             szn = sz.iloc[-1]
             bc = ['#2ca02c' if v >= 0 else '#d62728' for v in sz.values]
+            chart_label(f'SPY Volume -- {szn:+.2f}σ today', TIP_SPY_VOL)
             fig = go.Figure()
             fig.add_trace(go.Bar(x=sz.index, y=sz.values, marker_color=bc, opacity=0.7, showlegend=False))
             fig.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
             fig.add_hline(y=2, line_dash='dot', line_color='#2ca02c', line_width=0.8)
             fig.add_hline(y=-2, line_dash='dot', line_color='#d62728', line_width=0.8)
             fig.update_layout(
-                title=dict(
-                    text=f"<b>SPY Volume</b> -- {szn:+.2f}s today<br><span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>",
-                    font=dict(size=12),
-                ),
-                template='plotly_white', height=380, yaxis_title='Z-Score',
+                title=dict(text=f"<span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>", font=dict(size=12)),
+                template='plotly_white', height=350, yaxis_title='Z-Score',
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
-                margin=dict(b=70, t=65, l=45, r=25), bargap=0.15, dragmode=False,
+                margin=dict(b=70, t=35, l=45, r=25), bargap=0.15, dragmode=False,
             )
             add_src(fig, -0.25)
             st.plotly_chart(fig, use_container_width=True, key='fig_spy_vol', config=PCFG)
-            st.markdown(f'<div style="margin-top:-0.5rem">{info(TIP_SPY_VOL)}</div>', unsafe_allow_html=True)
         except Exception:
             st.info('SPY volume unavailable.')
 
@@ -1190,7 +1188,7 @@ with tab1:
         add_src(fig, -0.22)
         return fig
 
-    st.markdown('#### Sector ETFs')
+    chart_label('Sector ETFs', 'Each chart shows one of the 11 S&P 500 sector ETFs. Sectors group companies by industry -- Tech, Financials, Energy, Healthcare, etc. Comparing sectors reveals which parts of the economy are attracting or losing investor interest.')
     sc = st.columns(3)
     for i, (t, n) in enumerate(SECTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
@@ -1198,7 +1196,7 @@ with tab1:
             with sc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
 
-    st.markdown('#### Factor ETFs')
+    chart_label('Factor ETFs', 'Factors are investment styles like Momentum (recent winners), Value (cheap stocks), Quality (profitable companies), Min Vol (low volatility), Size (small-caps), and Yield (high dividends). Factor rotation shows which styles are in or out of favor.')
     fc = st.columns(3)
     for i, (t, n) in enumerate(FACTORS.items()):
         f = build_flow_chart(t, n, prices, volumes, cbd)
@@ -1227,14 +1225,15 @@ with tab1:
                 sector_rows.append({'Ticker': ticker, 'Sector': name, '1M Return': round(ret_1m, 2), '5D Return': round(ret_5d, 2) if pd.notna(ret_5d) else np.nan})
             alt_df = pd.DataFrame(sector_rows)
             if not alt_df.empty:
+                chart_label('Sector Return Heatmap', TIP_HEATMAP)
                 heat = alt.Chart(alt_df).mark_rect(cornerRadius=4).encode(
                     x=alt.X('Ticker:N', sort=list(SECTORS.keys()), title=None),
                     y=alt.Y('Metric:N', title=None),
                     color=alt.Color('Value:Q', scale=alt.Scale(scheme='redyellowgreen'), title='Return %'),
                     tooltip=['Sector:N', 'Ticker:N', 'Metric:N', alt.Tooltip('Value:Q', format='.2f')],
-                ).transform_fold(['1M Return', '5D Return'], as_=['Metric', 'Value']).properties(height=160, title='Sector return heatmap')
+                ).transform_fold(['1M Return', '5D Return'], as_=['Metric', 'Value']).properties(height=160)
                 st.altair_chart(heat, use_container_width=True)
-                st.markdown(f'{info(TIP_HEATMAP)} {SRC_BOTH}', unsafe_allow_html=True)
+                st.markdown(SRC_BOTH, unsafe_allow_html=True)
             else:
                 st.info('Not enough sector data for the Altair heatmap.')
         except Exception:
@@ -1247,15 +1246,16 @@ with tab1:
             un = fetch_fred('UNRATE', start='2023-01-01')
             macro_df = pd.concat({'10Y-2Y Spread': spread, 'Fed Funds': ff, 'Unemployment': un}, axis=1).dropna().reset_index(names='Date')
             if not macro_df.empty:
+                chart_label('Macro Pulse', TIP_MACRO_PULSE)
                 long_macro = macro_df.melt(id_vars='Date', var_name='Series', value_name='Value')
                 line = alt.Chart(long_macro).mark_line(point=False).encode(
                     x=alt.X('Date:T', title=None),
                     y=alt.Y('Value:Q', title=None),
                     color=alt.Color('Series:N', legend=alt.Legend(orient='bottom')),
                     tooltip=[alt.Tooltip('Date:T'), 'Series:N', alt.Tooltip('Value:Q', format='.2f')],
-                ).properties(height=220, title='Macro pulse')
+                ).properties(height=220)
                 st.altair_chart(line, use_container_width=True)
-                st.markdown(f'{info(TIP_MACRO_PULSE)} {SRC_FRED}', unsafe_allow_html=True)
+                st.markdown(SRC_FRED, unsafe_allow_html=True)
             else:
                 st.info('Not enough macro data for the Altair line chart.')
         except Exception:
@@ -1318,13 +1318,14 @@ with tab2:
 
     yc_col, yld_col = st.columns(2)
     with yc_col:
+        chart_label('Current Yield Curve', TIP_YIELD_CURVE)
         st.plotly_chart(build_yield_curve(), use_container_width=True, key='yc_rates', config=PCFG)
         c = yield_curve_commentary()
         if c:
             st.caption(c)
-        st.markdown(info(TIP_YIELD_CURVE), unsafe_allow_html=True)
 
     with yld_col:
+        chart_label('Treasury Yields', TIP_YIELDS_HIST)
         colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
         fig = go.Figure()
         for i, (sid, lbl) in enumerate(YIELDS.items()):
@@ -1334,16 +1335,16 @@ with tab2:
             except Exception:
                 pass
         fig.update_layout(
-            title=chart_title('Treasury Yields', 'Constant-maturity daily'),
+            title=dict(text="<span style='font-size:11px;color:#888'>Constant-maturity daily</span>", font=dict(size=12)),
             template='plotly_white', height=380, yaxis_title='Yield (%)',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_yields', config=PCFG)
-        st.markdown(info(TIP_YIELDS_HIST), unsafe_allow_html=True)
 
     r2a, r2b, r2c = st.columns(3)
     with r2a:
+        chart_label('Curve Spreads', TIP_SPREADS)
         fig = go.Figure()
         for sid, lbl in SPREADS.items():
             try:
@@ -1360,18 +1361,15 @@ with tab2:
         except Exception:
             pass
         fig.update_layout(
-            title=dict(
-                text="<b>Curve Spreads</b><br><span style='font-size:11px;color:#888'>Below 0 = inverted / shaded = contiguous inversion</span>",
-                font=dict(size=14),
-            ),
+            title=dict(text="<span style='font-size:11px;color:#888'>Below 0 = inverted / shaded = contiguous inversion</span>", font=dict(size=12)),
             template='plotly_white', height=340, yaxis_title='Spread (%)',
-            margin=dict(b=90, t=60, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_spreads', config=PCFG)
-        st.markdown(info(TIP_SPREADS), unsafe_allow_html=True)
 
     with r2b:
+        chart_label('Real Yield & Breakeven', TIP_REAL_YIELD)
         fig = go.Figure()
         for sid, lbl in [('DFII10', '10Y Real Yield'), ('T10YIE', '10Y Breakeven')]:
             try:
@@ -1380,15 +1378,15 @@ with tab2:
             except Exception:
                 pass
         fig.update_layout(
-            title=chart_title('Real Yield & Breakeven', 'TIPS + implied inflation'),
+            title=dict(text="<span style='font-size:11px;color:#888'>TIPS + implied inflation</span>", font=dict(size=12)),
             template='plotly_white', height=340, yaxis_title='%',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_realyield', config=PCFG)
-        st.markdown(info(TIP_REAL_YIELD), unsafe_allow_html=True)
 
     with r2c:
+        chart_label('Credit Spreads (OAS)', TIP_CREDIT)
         fig = go.Figure()
         for sid, lbl in CREDIT.items():
             try:
@@ -1404,18 +1402,18 @@ with tab2:
         except Exception:
             pass
         fig.update_layout(
-            title=chart_title('Credit Spreads (OAS)', 'Wider = risk-off'),
+            title=dict(text="<span style='font-size:11px;color:#888'>Wider = risk-off</span>", font=dict(size=12)),
             template='plotly_white', height=340, yaxis_title='bps',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_credit', config=PCFG)
-        st.markdown(info(TIP_CREDIT), unsafe_allow_html=True)
 
     st.divider()
 
     il, ir = st.columns(2)
     with il:
+        chart_label('CPI & Core CPI', TIP_CPI)
         fig = go.Figure()
         for sid, lbl in [('CPIAUCSL', 'CPI'), ('CPILFESL', 'Core CPI')]:
             try:
@@ -1425,15 +1423,15 @@ with tab2:
                 pass
         fig.add_hline(y=2.0, line_dash='dash', line_color='red', annotation_text='2%', annotation_position='bottom right')
         fig.update_layout(
-            title=chart_title('CPI & Core CPI', 'YoY %'),
+            title=dict(text="<span style='font-size:11px;color:#888'>YoY %</span>", font=dict(size=12)),
             template='plotly_white', height=360, yaxis_title='YoY %',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_cpi', config=PCFG)
-        st.markdown(info(TIP_CPI), unsafe_allow_html=True)
 
     with ir:
+        chart_label('PCE & Core PCE', TIP_PCE)
         fig = go.Figure()
         for sid, lbl in [('PCEPI', 'PCE'), ('PCEPILFE', 'Core PCE')]:
             try:
@@ -1443,16 +1441,16 @@ with tab2:
                 pass
         fig.add_hline(y=2.0, line_dash='dash', line_color='red', annotation_text='2%', annotation_position='bottom right')
         fig.update_layout(
-            title=chart_title('PCE & Core PCE', "YoY % / Fed's preferred gauge"),
+            title=dict(text="<span style='font-size:11px;color:#888'>YoY % / Fed's preferred gauge</span>", font=dict(size=12)),
             template='plotly_white', height=360, yaxis_title='YoY %',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_pce', config=PCFG)
-        st.markdown(info(TIP_PCE), unsafe_allow_html=True)
 
     el, gl = st.columns(2)
     with el:
+        chart_label('Fed Funds & Unemployment', TIP_FF_UNEMP)
         fig = go.Figure()
         for sid, lbl, clr in [('FEDFUNDS', 'Fed Funds', '#1f77b4'), ('UNRATE', 'Unemployment', '#ff7f0e')]:
             try:
@@ -1461,16 +1459,16 @@ with tab2:
             except Exception:
                 pass
         fig.update_layout(
-            title=chart_title('Fed Funds & Unemployment', 'Dual mandate'),
+            title=dict(text="<span style='font-size:11px;color:#888'>Dual mandate</span>", font=dict(size=12)),
             template='plotly_white', height=360, yaxis_title='%',
-            margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+            margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
         add_src(fig, -0.22)
         st.plotly_chart(fig, use_container_width=True, key='fig_ff', config=PCFG)
-        st.markdown(info(TIP_FF_UNEMP), unsafe_allow_html=True)
 
     with gl:
         try:
+            chart_label('Real GDP Growth', TIP_GDP)
             gdp = trim(fetch_fred('A191RL1Q225SBEA'), rmons)
             fig = go.Figure()
             fig.add_trace(go.Bar(
@@ -1479,13 +1477,12 @@ with tab2:
             ))
             fig.add_hline(y=0, line_color='black', line_width=1)
             fig.update_layout(
-                title=chart_title('Real GDP Growth', 'QoQ annualized %'),
+                title=dict(text="<span style='font-size:11px;color:#888'>QoQ annualized %</span>", font=dict(size=12)),
                 template='plotly_white', height=360, yaxis_title='% QoQ Ann.',
-                margin=dict(b=90, t=50, l=55, r=30), legend=LEG, dragmode=False,
+                margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
             )
             add_src(fig, -0.22)
             st.plotly_chart(fig, use_container_width=True, key='fig_gdp', config=PCFG)
-            st.markdown(info(TIP_GDP), unsafe_allow_html=True)
         except Exception:
             st.info('GDP data unavailable.')
 
