@@ -391,14 +391,14 @@ START = '2015-01-01'
 BENCH = 'SPY'
 ROLL = 126
 CM = dict(b=120, t=60, l=60, r=40)
-LEG = dict(orientation='h', yanchor='top', y=-0.25, x=0.5, xanchor='center', font=dict(size=11))
+LEG = dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11))
 PCFG = dict(displayModeBar=False, scrollZoom=False)
 DISCLAIMER = '*Disclaimer: This dashboard is for educational and informational purposes only. Nothing contained herein constitutes investment advice, a recommendation, or a solicitation to buy or sell any securities or financial instruments. The data presented may be delayed, incomplete, or inaccurate, and should not be relied upon for trading or investment decisions. Past performance is not indicative of future results. The authors and contributors assume no liability for any losses or damages arising from the use of this information. Consult a qualified financial advisor before making any investment decisions.*'
 
 # Last trading day (previous business day)
 _today = pd.Timestamp.today().normalize()
 LAST_TRADE = (_today - pd.tseries.offsets.BDay(1))
-LAST_TRADE_STR = LAST_TRADE.strftime('%d %B, %Y')
+LAST_TRADE_STR = LAST_TRADE.strftime('%b %d, %Y')
 
 SRC_BOTH = f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}</p>'
 SRC_FRED = f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:0.25rem">Source: FRED, data as of {LAST_TRADE_STR}</p>'
@@ -736,7 +736,7 @@ def snap_color(row):
         pass
     return st_
 
-def add_src(fig, y=-0.25):
+def add_src(fig, y=-0.32):
     fig.add_annotation(text=f'Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}', xref='paper', yref='paper', x=1.0, y=y, showarrow=False, font=dict(size=10, color='#888888'), xanchor='right')
 
 def compute_volume_zscore(v, lb=ZSCORE_LOOKBACK):
@@ -919,7 +919,7 @@ def build_yield_curve():
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=ls, y=vs, mode='lines+markers', line=dict(color='#1f77b4', width=2.5), marker=dict(size=8), showlegend=False))
     fig.update_layout(title=chart_title('Current Yield Curve', 'Spot rates 1M-30Y'), template='plotly_white', height=380, yaxis_title='Yield (%)', xaxis_title='Maturity', margin=dict(b=70, t=60, l=60, r=40), dragmode=False)
-    add_src(fig, -0.18)
+    add_src(fig, -0.32)
     return fig
 
 
@@ -1018,11 +1018,11 @@ The app is organized around several linked layers:
                     title=chart_title("SPY Preview", "Recent candlestick view"),
                     template="plotly_white", height=360,
                     margin=dict(b=65, t=55, l=55, r=35),
-                    legend=dict(orientation="h", yanchor="top", y=-0.18, x=0.5, xanchor="center", font=dict(size=11)),
+                    legend=dict(orientation="h", yanchor="top", y=-0.15, x=0.5, xanchor="center", font=dict(size=11)),
                     dragmode=False
                 )
                 fig_intro_candle.update_yaxes(title_text="Price ($)")
-                add_src(fig_intro_candle, -0.22)
+                add_src(fig_intro_candle, -0.30)
                 st.plotly_chart(fig_intro_candle, use_container_width=True, config=PCFG)
             else:
                 st.info("Intro candlestick preview unavailable.")
@@ -1112,10 +1112,10 @@ with tab1:
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
             template='plotly_white', height=380, yaxis_title='Return (%)',
             margin=dict(b=80, t=40, l=50, r=30),
-            legend=dict(orientation='h', yanchor='top', y=-0.22, x=0.5, xanchor='center', font=dict(size=11)),
+            legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
         )
-        add_src(fig_idx, -0.28)
+        add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
 
     with hdr_r:
@@ -1211,7 +1211,7 @@ with tab1:
             legend=LEG, dragmode=False,
         )
         fig_spy.update_yaxes(title_text='Price ($)')
-        add_src(fig_spy, -0.18)
+        add_src(fig_spy, -0.28)
         st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
     else:
         st.info('SPY candlestick data unavailable.')
@@ -1243,7 +1243,7 @@ with tab1:
                     yaxis=dict(range=[0, 1], dtick=0.25),
                     margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
                 )
-                add_src(fig, -0.25)
+                add_src(fig, -0.32)
                 st.plotly_chart(fig, use_container_width=True, key='fig_rotation', config=PCFG)
             else:
                 st.info('Rotation ratio unavailable.')
@@ -1268,7 +1268,7 @@ with tab1:
                     template='plotly_white', height=350, yaxis_title='Indexed',
                     margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
                 )
-                add_src(fig, -0.25)
+                add_src(fig, -0.32)
                 st.plotly_chart(fig, use_container_width=True, key='fig_breadth', config=PCFG)
         except Exception:
             st.info('Breadth data unavailable.')
@@ -1292,7 +1292,7 @@ with tab1:
                 template='plotly_white', height=350, yaxis_title='Ratio',
                 margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
             )
-            add_src(fig, -0.25)
+            add_src(fig, -0.32)
             st.plotly_chart(fig, use_container_width=True, key='fig_cyc_def', config=PCFG)
         except Exception:
             st.info('Cyclical/Defensive unavailable.')
@@ -1319,7 +1319,7 @@ with tab1:
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
                 margin=dict(b=70, t=35, l=45, r=25), bargap=0.15, dragmode=False,
             )
-            add_src(fig, -0.25)
+            add_src(fig, -0.32)
             st.plotly_chart(fig, use_container_width=True, key='fig_spy_vol', config=PCFG)
         except Exception:
             st.info('SPY volume unavailable.')
@@ -1348,7 +1348,7 @@ with tab1:
                 template='plotly_white', height=380, margin=dict(b=90, t=50, l=55, r=30),
                 legend=LEG, dragmode=False,
             )
-            add_src(fig, -0.22)
+            add_src(fig, -0.30)
             st.plotly_chart(fig, use_container_width=True, key=f'rel_{ks}', config=PCFG)
         with cr2:
             fig = go.Figure()
@@ -1362,7 +1362,7 @@ with tab1:
                 template='plotly_white', height=380, margin=dict(b=90, t=50, l=55, r=30),
                 legend=LEG, dragmode=False,
             )
-            add_src(fig, -0.22)
+            add_src(fig, -0.30)
             st.plotly_chart(fig, use_container_width=True, key=f'alpha_{ks}', config=PCFG)
 
     label_info('Factors', "Factor ETFs isolate specific investment styles. Min Vol = low-volatility stocks, Momentum = recent winners, Quality = profitable companies, Size = small-caps, Value = cheap stocks, Yield = high-dividend payers. Relative performance shows which style is beating the broad market.")
@@ -1407,12 +1407,12 @@ with tab1:
                 font=dict(size=13),
             ),
             template='plotly_white', height=320, margin=dict(b=55, t=65, l=50, r=40),
-            legend=dict(orientation='h', yanchor='top', y=-0.18, x=0.5, xanchor='center', font=dict(size=11)),
+            legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, bargap=0.1,
         )
         fig.update_yaxes(title_text='Return %', secondary_y=False)
         fig.update_yaxes(title_text='Flow Z', secondary_y=True, range=[-3.5, 3.5], dtick=1, showgrid=False)
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         return fig
 
     chart_label('Sector ETFs', 'Each chart shows one of the 11 S&P 500 sector ETFs. Sectors group companies by industry -- Tech, Financials, Energy, Healthcare, etc. Comparing sectors reveals which parts of the economy are attracting or losing investor interest.')
@@ -1566,7 +1566,7 @@ with tab2:
             template='plotly_white', height=380, yaxis_title='Yield (%)',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_yields', config=PCFG)
 
     r2a, r2b, r2c = st.columns(3)
@@ -1592,7 +1592,7 @@ with tab2:
             template='plotly_white', height=340, yaxis_title='Spread (%)',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_spreads', config=PCFG)
 
     with r2b:
@@ -1609,7 +1609,7 @@ with tab2:
             template='plotly_white', height=340, yaxis_title='%',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_realyield', config=PCFG)
 
     with r2c:
@@ -1633,7 +1633,7 @@ with tab2:
             template='plotly_white', height=340, yaxis_title='bps',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_credit', config=PCFG)
 
     st.divider()
@@ -1654,7 +1654,7 @@ with tab2:
             template='plotly_white', height=360, yaxis_title='YoY %',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_cpi', config=PCFG)
 
     with ir:
@@ -1672,7 +1672,7 @@ with tab2:
             template='plotly_white', height=360, yaxis_title='YoY %',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_pce', config=PCFG)
 
     el, gl = st.columns(2)
@@ -1690,7 +1690,7 @@ with tab2:
             template='plotly_white', height=360, yaxis_title='%',
             margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
         )
-        add_src(fig, -0.22)
+        add_src(fig, -0.30)
         st.plotly_chart(fig, use_container_width=True, key='fig_ff', config=PCFG)
 
     with gl:
@@ -1708,7 +1708,7 @@ with tab2:
                 template='plotly_white', height=360, yaxis_title='% QoQ Ann.',
                 margin=dict(b=90, t=35, l=55, r=30), legend=LEG, dragmode=False,
             )
-            add_src(fig, -0.22)
+            add_src(fig, -0.30)
             st.plotly_chart(fig, use_container_width=True, key='fig_gdp', config=PCFG)
         except Exception:
             st.info('GDP data unavailable.')
