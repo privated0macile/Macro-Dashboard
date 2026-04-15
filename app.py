@@ -98,14 +98,18 @@ def info(tip):
 def hdr(title, tip, tag="h3"):
     """Render a heading with an info tooltip beside it."""
     st.markdown(
-        f'<{tag} style="display:inline;vertical-align:middle">{title}</{tag}>{info(tip)}',
+        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:0.25rem">'
+        f'<{tag} style="margin:0;padding:0">{title}</{tag}>{info(tip)}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
 def label_info(label, tip):
     """Render a label with an info tooltip, matching section header size."""
     st.markdown(
-        f'<h3 style="display:inline;vertical-align:middle;margin:0">{label}</h3>{info(tip)}',
+        f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:0.25rem">'
+        f'<h3 style="margin:0;padding:0">{label}</h3>{info(tip)}'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
@@ -1193,8 +1197,6 @@ with tab1:
         if f:
             with sc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
-                if t in SECTOR_TIPS:
-                    st.markdown(f'<div style="margin-top:-0.5rem">{info(SECTOR_TIPS[t])}</div>', unsafe_allow_html=True)
 
     st.markdown('#### Factor ETFs')
     fc = st.columns(3)
@@ -1203,13 +1205,11 @@ with tab1:
         if f:
             with fc[i % 3]:
                 st.plotly_chart(f, use_container_width=True, key=f'flow_{t}', config=PCFG)
-                if t in FACTOR_TIPS:
-                    st.markdown(f'<div style="margin-top:-0.5rem">{info(FACTOR_TIPS[t])}</div>', unsafe_allow_html=True)
 
     st.divider()
 
     # ── Altair Views ───────────────────────────────────────────────────────
-    hdr('Altair Views', "Lightweight cross-sectional visuals to quickly scan sector momentum and macro conditions. These complement the deeper Plotly charts above.")
+    st.subheader('Altair Views')
     st.caption('A pair of lighter-weight Altair visuals to make the cross-section easier to scan.')
 
     alt_left, alt_right = st.columns(2)
