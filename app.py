@@ -918,7 +918,7 @@ def build_yield_curve():
             pass
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=ls, y=vs, mode='lines+markers', line=dict(color='#1f77b4', width=2.5), marker=dict(size=8), showlegend=False))
-    fig.update_layout(title=chart_title('Current Yield Curve', 'Spot rates 1M-30Y'), template='plotly_white', height=380, yaxis_title='Yield (%)', xaxis_title='Maturity', margin=dict(b=70, t=60, l=60, r=40), dragmode=False)
+    fig.update_layout(title=chart_title('Current Yield Curve', 'Spot rates 1M-30Y'), template='plotly_white', height=380, yaxis_title='Yield (%)', xaxis_title='Maturity', margin=dict(b=100, t=60, l=60, r=40), dragmode=False)
     add_src(fig, -0.32)
     return fig
 
@@ -1111,7 +1111,7 @@ with tab1:
         fig_idx.update_layout(
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
             template='plotly_white', height=380, yaxis_title='Return (%)',
-            margin=dict(b=80, t=40, l=50, r=30),
+            margin=dict(b=110, t=40, l=50, r=30),
             legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
         )
@@ -1207,7 +1207,7 @@ with tab1:
         ))
         fig_spy.update_layout(
             title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
-            template='plotly_white', height=420, margin=dict(b=70, t=60, l=60, r=40),
+            template='plotly_white', height=420, margin=dict(b=100, t=60, l=60, r=40),
             legend=LEG, dragmode=False,
         )
         fig_spy.update_yaxes(title_text='Price ($)')
@@ -1239,9 +1239,9 @@ with tab1:
                 fig.add_hrect(y0=0.25, y1=0.75, fillcolor='gray', opacity=0.08, line_width=0)
                 fig.update_layout(
                     title=dict(text=f"<span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>", font=dict(size=12)),
-                    template='plotly_white', height=350, yaxis_title='%-tile',
+                    template='plotly_white', height=380, yaxis_title='%-tile',
                     yaxis=dict(range=[0, 1], dtick=0.25),
-                    margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
+                    margin=dict(b=100, t=35, l=45, r=25), dragmode=False,
                 )
                 add_src(fig, -0.32)
                 st.plotly_chart(fig, use_container_width=True, key='fig_rotation', config=PCFG)
@@ -1265,8 +1265,8 @@ with tab1:
                 fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
                 fig.update_layout(
                     title=dict(text=f"<span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>", font=dict(size=12)),
-                    template='plotly_white', height=350, yaxis_title='Indexed',
-                    margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
+                    template='plotly_white', height=380, yaxis_title='Indexed',
+                    margin=dict(b=100, t=35, l=45, r=25), dragmode=False,
                 )
                 add_src(fig, -0.32)
                 st.plotly_chart(fig, use_container_width=True, key='fig_breadth', config=PCFG)
@@ -1289,8 +1289,8 @@ with tab1:
             fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
             fig.update_layout(
                 title=dict(text=f"<span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>", font=dict(size=12)),
-                template='plotly_white', height=350, yaxis_title='Ratio',
-                margin=dict(b=70, t=35, l=45, r=25), dragmode=False,
+                template='plotly_white', height=380, yaxis_title='Ratio',
+                margin=dict(b=100, t=35, l=45, r=25), dragmode=False,
             )
             add_src(fig, -0.32)
             st.plotly_chart(fig, use_container_width=True, key='fig_cyc_def', config=PCFG)
@@ -1315,9 +1315,9 @@ with tab1:
             fig.add_hline(y=-2, line_dash='dot', line_color='#d62728', line_width=0.8)
             fig.update_layout(
                 title=dict(text=f"<span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>", font=dict(size=12)),
-                template='plotly_white', height=350, yaxis_title='Z-Score',
+                template='plotly_white', height=380, yaxis_title='Z-Score',
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
-                margin=dict(b=70, t=35, l=45, r=25), bargap=0.15, dragmode=False,
+                margin=dict(b=100, t=35, l=45, r=25), bargap=0.15, dragmode=False,
             )
             add_src(fig, -0.32)
             st.plotly_chart(fig, use_container_width=True, key='fig_spy_vol', config=PCFG)
@@ -1406,7 +1406,7 @@ with tab1:
                 text=f"<b>{lbl}</b> ({t})<br><span style='font-size:11px;color:#666'>Return % / Flow z (252d) / green = accumulation</span>",
                 font=dict(size=13),
             ),
-            template='plotly_white', height=320, margin=dict(b=55, t=65, l=50, r=40),
+            template='plotly_white', height=350, margin=dict(b=90, t=65, l=50, r=40),
             legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, bargap=0.1,
         )
