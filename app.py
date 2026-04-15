@@ -77,6 +77,93 @@ st.markdown("""
         visibility: visible;
         opacity: 1;
     }
+
+    /* ── Responsive layout ── */
+
+    /* Tables: always allow horizontal scroll on narrow screens */
+    [data-testid="stDataFrame"] { overflow-x: auto !important; }
+
+    /* Metric cards: shrink text on narrow screens */
+    @media (max-width: 900px) {
+        [data-testid="stMetricValue"] { font-size: 0.9rem !important; }
+        [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+    }
+
+    /* Medium screens: tighten padding + start shrinking chart text */
+    @media (max-width: 1024px) {
+        .block-container { padding-left: 1rem; padding-right: 1rem; }
+
+        /* Plotly: shrink legends, axis labels, tick text */
+        .js-plotly-plot .legendtext { font-size: 10px !important; }
+        .js-plotly-plot .g-xtitle text,
+        .js-plotly-plot .g-ytitle text { font-size: 11px !important; }
+        .js-plotly-plot .xtick text,
+        .js-plotly-plot .ytick text { font-size: 9px !important; }
+        .js-plotly-plot .gtitle { font-size: 11px !important; }
+
+        /* Altair / Vega: shrink text */
+        .vega-embed text { font-size: 10px !important; }
+    }
+
+    /* Narrow / mobile: stack Streamlit columns vertically */
+    @media (max-width: 768px) {
+        .block-container { padding-left: 0.5rem; padding-right: 0.5rem; }
+
+        /* Force columns to stack */
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+        }
+        [data-testid="stHorizontalBlock"] > div {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 0 !important;
+        }
+
+        /* Section headers: scale down */
+        h3 { font-size: 1.1rem !important; }
+        h1 { font-size: 1.5rem !important; }
+
+        /* Chart labels: scale down */
+        .info-tip { margin-left: 4px; }
+        .info-box { width: min(260px, 85vw); font-size: 11.5px; }
+
+        /* Radio buttons: wrap */
+        [data-testid="stRadio"] > div {
+            flex-wrap: wrap !important;
+            gap: 0.25rem !important;
+        }
+
+        /* Plotly: further shrink for narrow */
+        .js-plotly-plot .legendtext { font-size: 9px !important; }
+        .js-plotly-plot .g-xtitle text,
+        .js-plotly-plot .g-ytitle text { font-size: 10px !important; }
+        .js-plotly-plot .xtick text,
+        .js-plotly-plot .ytick text { font-size: 8px !important; }
+        .js-plotly-plot .gtitle { font-size: 10px !important; }
+
+        /* Plotly source annotations */
+        .js-plotly-plot .annotation-text { font-size: 8px !important; }
+
+        /* Altair */
+        .vega-embed text { font-size: 9px !important; }
+    }
+
+    /* Very narrow (phone portrait) */
+    @media (max-width: 480px) {
+        .block-container { padding-left: 0.25rem; padding-right: 0.25rem; }
+        h3 { font-size: 1rem !important; }
+        .info-box { width: min(240px, 90vw); font-size: 11px; }
+        [data-testid="stMetricValue"] { font-size: 0.8rem !important; }
+
+        /* Plotly: smallest */
+        .js-plotly-plot .legendtext { font-size: 8px !important; }
+        .js-plotly-plot .g-xtitle text,
+        .js-plotly-plot .g-ytitle text { font-size: 9px !important; }
+        .js-plotly-plot .xtick text,
+        .js-plotly-plot .ytick text { font-size: 7px !important; }
+        .js-plotly-plot .gtitle { font-size: 9px !important; }
+        .js-plotly-plot .annotation-text { font-size: 7px !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
