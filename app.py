@@ -45,10 +45,11 @@ st.markdown("""
     .info-box {
         visibility: hidden;
         opacity: 0;
-        position: fixed;
+        position: absolute;
         z-index: 9999;
-        width: 300px;
-        max-width: 90vw;
+        top: 130%;
+        left: 0;
+        width: min(300px, 80vw);
         padding: 10px 13px;
         background: #2b2b2b;
         color: #eee;
@@ -62,30 +63,21 @@ st.markdown("""
         transition: opacity 0.18s;
         pointer-events: none;
     }
+    .info-box::after {
+        content: "";
+        position: absolute;
+        bottom: 100%;
+        left: 12px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: transparent transparent #2b2b2b transparent;
+    }
     .info-tip:hover .info-box,
     .info-tip:focus .info-box {
         visibility: visible;
         opacity: 1;
     }
 </style>
-<script>
-document.addEventListener('mouseover', function(e) {
-    var tip = e.target.closest('.info-tip');
-    if (!tip) return;
-    var box = tip.querySelector('.info-box');
-    if (!box) return;
-    var rect = tip.getBoundingClientRect();
-    var bw = 300;
-    var left = rect.left + rect.width/2 - bw/2;
-    if (left < 8) left = 8;
-    if (left + bw > window.innerWidth - 8) left = window.innerWidth - bw - 8;
-    box.style.left = left + 'px';
-    box.style.top = (rect.top - box.offsetHeight - 8) + 'px';
-    if (rect.top - box.offsetHeight - 8 < 8) {
-        box.style.top = (rect.bottom + 8) + 'px';
-    }
-});
-</script>
 """, unsafe_allow_html=True)
 
 # ── Tooltip helpers ────────────────────────────────────────────────────────
