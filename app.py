@@ -1725,9 +1725,9 @@ with tab2:
         fig.update_layout(
             title=dict(text="<span style='font-size:11px;color:#888'>YoY %</span>", font=dict(size=12)),
             template='plotly_white', height=320, yaxis_title='YoY %',
-            margin=dict(b=85, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
+            margin=dict(b=100, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.25)
+        add_src(fig, -0.35)
         st.plotly_chart(fig, use_container_width=True, key='fig_cpi', config=PCFG)
 
     with ir:
@@ -1743,9 +1743,9 @@ with tab2:
         fig.update_layout(
             title=dict(text="<span style='font-size:11px;color:#888'>Fed's preferred gauge</span>", font=dict(size=12)),
             template='plotly_white', height=320, yaxis_title='YoY %',
-            margin=dict(b=85, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
+            margin=dict(b=100, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.25)
+        add_src(fig, -0.35)
         st.plotly_chart(fig, use_container_width=True, key='fig_pce', config=PCFG)
 
     with el:
@@ -1760,9 +1760,9 @@ with tab2:
         fig.update_layout(
             title=dict(text="<span style='font-size:11px;color:#888'>Dual mandate</span>", font=dict(size=12)),
             template='plotly_white', height=320, yaxis_title='%',
-            margin=dict(b=85, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
+            margin=dict(b=100, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.25)
+        add_src(fig, -0.35)
         st.plotly_chart(fig, use_container_width=True, key='fig_ff', config=PCFG)
 
     with gl:
@@ -1778,9 +1778,9 @@ with tab2:
             fig.update_layout(
                 title=dict(text="<span style='font-size:11px;color:#888'>QoQ annualized %</span>", font=dict(size=12)),
                 template='plotly_white', height=320, yaxis_title='% QoQ Ann.',
-                margin=dict(b=85, t=35, l=45, r=25), dragmode=False,
+                margin=dict(b=100, t=35, l=45, r=25), dragmode=False,
             )
-            add_src(fig, -0.25)
+            add_src(fig, -0.35)
             st.plotly_chart(fig, use_container_width=True, key='fig_gdp', config=PCFG)
         except Exception:
             st.info('GDP data unavailable.')
