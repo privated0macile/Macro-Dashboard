@@ -1536,46 +1536,75 @@ with tab1:
     st.subheader('Additional Visualizations')
     st.caption('Supplementary chart types for broader context. Includes a Plotly candlestick, Altair cross-section views, and a D3.js interactive bar chart.')
 
-    addv_left, addv_right = st.columns(2)
-    with addv_left:
-        hdr('Benchmark Price Action', TIP_CANDLE)
-        spy_window = st.selectbox('SPY window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
-        spy_start = {
-            '3M': prices.index.max() - pd.DateOffset(months=3),
-            '6M': prices.index.max() - pd.DateOffset(months=6),
-            '1Y': prices.index.max() - pd.DateOffset(years=1),
-            'Since 2015': pd.Timestamp(START),
-        }[spy_window]
-        spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
-        if not spy_ohlc.empty:
-            fig_spy = go.Figure()
-            fig_spy.add_trace(go.Candlestick(
-                x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
-                low=spy_ohlc['Low'], close=spy_ohlc['Close'],
-                increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
-            ))
-            fig_spy.add_trace(go.Scatter(
-                x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
-                mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
-            ))
-            fig_spy.update_layout(
-                title=chart_title('SPY Candlestick', '20-day MA overlay'),
-                template='plotly_white', height=380, margin=dict(b=100, t=50, l=50, r=30),
-                legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)),
-                dragmode=False,
-            )
-            fig_spy.update_yaxes(title_text='Price ($)')
-            fig_spy.update_xaxes(rangeslider_visible=False)
-            add_src(fig_spy, -0.30)
-            st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
-        else:
-            st.info('SPY candlestick data unavailable.')
+    hdr('Benchmark Price Action', TIP_CANDLE)
+    spy_window = st.selectbox('SPY window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
+    spy_start = {
+        '3M': prices.index.max() - pd.DateOffset(months=3),
+        '6M': prices.index.max() - pd.DateOffset(months=6),
+        '1Y': prices.index.max() - pd.DateOffset(years=1),
+        'Since 2015': pd.Timestamp(START),
+    }[spy_window]
+    spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
+    if not spy_ohlc.empty:
+        fig_spy = go.Figure()
+        fig_spy.add_trace(go.Candlestick(
+            x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
+            low=spy_ohlc['Low'], close=spy_ohlc['Close'],
+            increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
+        ))
+        fig_spy.add_trace(go.Scatter(
+            x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
+            mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
+        ))
+        fig_spy.update_layout(
+            title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
+            template='plotly_white', height=380, margin=dict(b=100, t=50, l=50, r=30),
+            legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
+            dragmode=False,
+        )
+        fig_spy.update_yaxes(title_text='Price ($)')
+        fig_spy.update_xaxes(rangeslider_visible=False)
+        add_src(fig_spy, -0.30)
+        st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
+    else:
+        st.info('SPY candlestick data unavailable.')
 
-    with addv_right:
+    # ── 3-column row: Altair Heatmap | D3 Bar | Altair Macro Pulse ─────────
+    addv_c1, addv_c2, addv_c3 = st.columns(3)
+
+    with addv_c1:
+        try:
+            sector_rows = []
+            for ticker, name in SECTORS.items():
+                if ticker not in prices.columns:
+                    continue
+                series = prices[ticker].dropna()
+                if len(series) < 22:
+                    continue
+                ret_1m = (series.iloc[-1] / series.iloc[-21] - 1) * 100
+                ret_5d = (series.iloc[-1] / series.iloc[-5] - 1) * 100 if len(series) >= 5 else np.nan
+                sector_rows.append({'Ticker': ticker, 'Sector': name, '1M Return': round(ret_1m, 2), '5D Return': round(ret_5d, 2) if pd.notna(ret_5d) else np.nan})
+            alt_df = pd.DataFrame(sector_rows)
+            if not alt_df.empty:
+                chart_label('Sector Return Heatmap', TIP_HEATMAP)
+                heat = alt.Chart(alt_df).mark_rect(cornerRadius=4).encode(
+                    x=alt.X('Ticker:N', sort=list(SECTORS.keys()), title=None),
+                    y=alt.Y('Metric:N', title=None),
+                    color=alt.Color('Value:Q', scale=alt.Scale(scheme='redyellowgreen'), title='Return %'),
+                    tooltip=['Sector:N', 'Ticker:N', 'Metric:N', alt.Tooltip('Value:Q', format='.2f')],
+                ).transform_fold(['1M Return', '5D Return'], as_=['Metric', 'Value']).properties(height=180)
+                st.altair_chart(heat, use_container_width=True)
+                st.markdown(f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:-0.5rem">Source: Yahoo Finance, data as of {LAST_TRADE_STR}</p>', unsafe_allow_html=True)
+            else:
+                st.info('Heatmap unavailable.')
+        except Exception:
+            st.info('Heatmap unavailable.')
+
+    with addv_c2:
         st.markdown(
-            f'<div style="display:flex;align-items:center;gap:5px">'
-            f'<span style="font-weight:700;font-size:0.9rem">D3: Sector 1M Returns</span>'
-            f'</div>',
+            '<div style="display:flex;align-items:center;gap:5px">'
+            '<span style="font-weight:700;font-size:0.9rem">D3: Sector 1M Returns</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
         try:
@@ -1598,9 +1627,9 @@ with tab1:
             <script>
             (function() {{
                 const data = {d3_data_json};
-                const margin = {{top: 25, right: 15, bottom: 45, left: 45}};
-                const width = 500 - margin.left - margin.right;
-                const height = 300 - margin.top - margin.bottom;
+                const margin = {{top: 20, right: 10, bottom: 40, left: 40}};
+                const width = 400 - margin.left - margin.right;
+                const height = 260 - margin.top - margin.bottom;
 
                 const svg = d3.select("#d3-sector-bar")
                     .append("svg")
@@ -1610,19 +1639,19 @@ with tab1:
                     .append("g")
                     .attr("transform", `translate(${{margin.left}},${{margin.top}})`);
 
-                const x = d3.scaleBand().domain(data.map(d => d.ticker)).range([0, width]).padding(0.25);
+                const x = d3.scaleBand().domain(data.map(d => d.ticker)).range([0, width]).padding(0.2);
                 const yMax = d3.max(data, d => Math.abs(d.ret)) * 1.15;
                 const y = d3.scaleLinear().domain([-yMax, yMax]).range([height, 0]);
 
-                svg.append("g").attr("transform", `translate(0,${{height}})`).call(d3.axisBottom(x)).selectAll("text").style("font-size", "9px");
-                svg.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(d => d + "%")).selectAll("text").style("font-size", "9px");
+                svg.append("g").attr("transform", `translate(0,${{height}})`).call(d3.axisBottom(x)).selectAll("text").style("font-size", "8px");
+                svg.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(d => d + "%")).selectAll("text").style("font-size", "8px");
                 svg.append("line").attr("x1", 0).attr("x2", width).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", "#999").attr("stroke-dasharray", "4,3");
 
-                svg.append("text").attr("x", width / 2).attr("y", -8).attr("text-anchor", "middle").style("font-size", "11px").style("font-weight", "bold").text("Sorted sector 1M returns");
+                svg.append("text").attr("x", width / 2).attr("y", -6).attr("text-anchor", "middle").style("font-size", "10px").style("font-weight", "bold").text("Sorted 1M returns");
 
                 const tooltip = d3.select("#d3-sector-bar").append("div")
                     .style("position", "absolute").style("background", "#2b2b2b").style("color", "#eee")
-                    .style("padding", "5px 8px").style("border-radius", "5px").style("font-size", "11px")
+                    .style("padding", "4px 7px").style("border-radius", "4px").style("font-size", "10px")
                     .style("pointer-events", "none").style("opacity", 0);
 
                 svg.selectAll(".bar").data(data).join("rect").attr("class", "bar")
@@ -1635,7 +1664,7 @@ with tab1:
                         d3.select(this).attr("opacity", 1).attr("stroke", "#333").attr("stroke-width", 1.5);
                         tooltip.style("opacity", 1)
                             .html("<b>" + d.name + "</b> (" + d.ticker + ")<br>1M: " + (d.ret > 0 ? "+" : "") + d.ret + "%")
-                            .style("left", (event.offsetX + 10) + "px").style("top", (event.offsetY - 30) + "px");
+                            .style("left", (event.offsetX + 8) + "px").style("top", (event.offsetY - 25) + "px");
                     }})
                     .on("mouseout", function() {{
                         d3.select(this).attr("opacity", 0.8).attr("stroke", "none");
@@ -1647,47 +1676,17 @@ with tab1:
                     }});
                 svg.on("dblclick", function() {{ svg.selectAll(".bar").attr("opacity", 0.8); }});
 
-                svg.append("text").attr("x", width).attr("y", height + 38).attr("text-anchor", "end")
-                    .style("font-size", "8px").style("fill", "#888")
-                    .text("Source: Yahoo Finance, data as of {LAST_TRADE_STR} | D3.js");
+                svg.append("text").attr("x", width).attr("y", height + 33).attr("text-anchor", "end")
+                    .style("font-size", "7px").style("fill", "#888")
+                    .text("Yahoo Finance, as of {LAST_TRADE_STR} | D3.js");
             }})();
             </script>
             """
-            components.html(d3_html, height=330, scrolling=False)
+            components.html(d3_html, height=290, scrolling=False)
         except Exception:
-            st.info('D3 sector chart unavailable.')
+            st.info('D3 chart unavailable.')
 
-    st.markdown('#### Altair Cross-Section Views')
-    alt_left, alt_right = st.columns(2)
-    with alt_left:
-        try:
-            sector_rows = []
-            for ticker, name in SECTORS.items():
-                if ticker not in prices.columns:
-                    continue
-                series = prices[ticker].dropna()
-                if len(series) < 22:
-                    continue
-                ret_1m = (series.iloc[-1] / series.iloc[-21] - 1) * 100
-                ret_5d = (series.iloc[-1] / series.iloc[-5] - 1) * 100 if len(series) >= 5 else np.nan
-                sector_rows.append({'Ticker': ticker, 'Sector': name, '1M Return': round(ret_1m, 2), '5D Return': round(ret_5d, 2) if pd.notna(ret_5d) else np.nan})
-            alt_df = pd.DataFrame(sector_rows)
-            if not alt_df.empty:
-                chart_label('Sector Return Heatmap', TIP_HEATMAP)
-                heat = alt.Chart(alt_df).mark_rect(cornerRadius=4).encode(
-                    x=alt.X('Ticker:N', sort=list(SECTORS.keys()), title=None),
-                    y=alt.Y('Metric:N', title=None),
-                    color=alt.Color('Value:Q', scale=alt.Scale(scheme='redyellowgreen'), title='Return %'),
-                    tooltip=['Sector:N', 'Ticker:N', 'Metric:N', alt.Tooltip('Value:Q', format='.2f')],
-                ).transform_fold(['1M Return', '5D Return'], as_=['Metric', 'Value']).properties(height=160)
-                st.altair_chart(heat, use_container_width=True)
-                st.markdown(f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:-0.5rem">Source: FRED / Yahoo Finance, data as of {LAST_TRADE_STR}</p>', unsafe_allow_html=True)
-            else:
-                st.info('Not enough sector data for the Altair heatmap.')
-        except Exception:
-            st.info('Altair sector heatmap unavailable.')
-
-    with alt_right:
+    with addv_c3:
         try:
             spread = fetch_fred('T10Y2Y', start='2023-01-01')
             ff = fetch_fred('FEDFUNDS', start='2023-01-01')
@@ -1705,9 +1704,9 @@ with tab1:
                 st.altair_chart(line, use_container_width=True)
                 st.markdown(f'<p style="color:#888;font-size:0.625rem;text-align:right;margin-top:-0.5rem">Source: FRED, data as of {LAST_TRADE_STR}</p>', unsafe_allow_html=True)
             else:
-                st.info('Not enough macro data for the Altair line chart.')
+                st.info('Macro pulse unavailable.')
         except Exception:
-            st.info('Altair macro chart unavailable.')
+            st.info('Macro pulse unavailable.')
 
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
