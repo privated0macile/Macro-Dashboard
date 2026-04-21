@@ -1180,12 +1180,12 @@ with tab1:
         fig_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
         fig_idx.update_layout(
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
-            template='plotly_white', height=460, yaxis_title='Return (%)',
-            margin=dict(b=130, t=40, l=50, r=30),
+            template='plotly_white', height=380, yaxis_title='Return (%)',
+            margin=dict(b=100, t=40, l=50, r=30),
             legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
         )
-        add_src(fig_idx, -0.42)
+        add_src(fig_idx, -0.35)
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
 
     with hdr_r:
@@ -1252,39 +1252,6 @@ with tab1:
             st.markdown(SRC_BOTH, unsafe_allow_html=True)
 
     st.divider()
-
-    # ── Benchmark Price Action ─────────────────────────────────────────────
-    hdr('Benchmark Price Action', TIP_CANDLE)
-    st.caption('Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.')
-    spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
-    spy_start = {
-        '3M': prices.index.max() - pd.DateOffset(months=3),
-        '6M': prices.index.max() - pd.DateOffset(months=6),
-        '1Y': prices.index.max() - pd.DateOffset(years=1),
-        'Since 2015': pd.Timestamp(START),
-    }[spy_window]
-    spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
-    if not spy_ohlc.empty:
-        fig_spy = go.Figure()
-        fig_spy.add_trace(go.Candlestick(
-            x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
-            low=spy_ohlc['Low'], close=spy_ohlc['Close'],
-            increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
-        ))
-        fig_spy.add_trace(go.Scatter(
-            x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
-            mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
-        ))
-        fig_spy.update_layout(
-            title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
-            template='plotly_white', height=460, margin=dict(b=160, t=60, l=60, r=40),
-            legend=LEG, dragmode=False,
-        )
-        fig_spy.update_yaxes(title_text='Price ($)')
-        add_src(fig_spy, -0.52)
-        st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
-    else:
-        st.info('SPY candlestick data unavailable.')
 
     # ── Daily Positioning Feed ─────────────────────────────────────────────
     hdr('Daily Positioning Feed', TIP_POSITIONING)
@@ -1503,9 +1470,71 @@ with tab1:
 
     st.divider()
 
-    # ── Altair Views ───────────────────────────────────────────────────────
-    st.subheader('Altair Views')
-    st.caption('A pair of lighter-weight Altair visuals to make the cross-section easier to scan.')
+    # ── Sector ETF Holdings & Daily Attribution ────────────────────────────
+    hdr('Sector ETF Holdings & Daily Attribution', TIP_HOLDINGS)
+    st.caption('Expand any sector to see top holdings, weight, daily return, and contribution (weight x return). Sorted by contribution. Weights are hardcoded and updated biannually -- minor drift expected between updates.')
+
+    ec = st.columns(2)
+    for i, (t, n) in enumerate(SECTORS.items()):
+        with ec[i % 2]:
+            with st.expander(f'**{n}** ({t})'):
+                try:
+                    da, er, il = build_holdings_attr(t, prices)
+                    st2 = 'live' if il else 'static'
+                    if not da.empty:
+                        ex = da['Contribution'].sum()
+                        if pd.notna(er) and abs(er) > 0.001:
+                            st.caption(f'ETF 1D: **{er:+.2f}%** / Top holdings explain: **{ex:+.3f}%** ({ex / er * 100:.0f}%) / {st2}')
+                        else:
+                            er_txt = f'{er:+.2f}%' if pd.notna(er) else 'N/A'
+                            st.caption(f'ETF 1D: **{er_txt}** / {st2}')
+                        st.dataframe(style_attr(da), hide_index=True, use_container_width=True, height=min(35 * len(da) + 38, 340))
+                    else:
+                        st.info('Holdings data unavailable.')
+                except Exception:
+                    st.info('Holdings data unavailable.')
+    st.markdown(SRC_YF, unsafe_allow_html=True)
+
+    st.divider()
+
+    # ── Additional Visualizations ──────────────────────────────────────────
+    st.subheader('Additional Visualizations')
+    st.caption('Supplementary chart types for broader context. The candlestick provides a different encoding of price action, while the Altair views offer a cross-sectional snapshot and macro overlay.')
+
+    hdr('Benchmark Price Action', TIP_CANDLE)
+    st.caption('Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.')
+    spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
+    spy_start = {
+        '3M': prices.index.max() - pd.DateOffset(months=3),
+        '6M': prices.index.max() - pd.DateOffset(months=6),
+        '1Y': prices.index.max() - pd.DateOffset(years=1),
+        'Since 2015': pd.Timestamp(START),
+    }[spy_window]
+    spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
+    if not spy_ohlc.empty:
+        fig_spy = go.Figure()
+        fig_spy.add_trace(go.Candlestick(
+            x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
+            low=spy_ohlc['Low'], close=spy_ohlc['Close'],
+            increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
+        ))
+        fig_spy.add_trace(go.Scatter(
+            x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
+            mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
+        ))
+        fig_spy.update_layout(
+            title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
+            template='plotly_white', height=460, margin=dict(b=160, t=60, l=60, r=40),
+            legend=LEG, dragmode=False,
+        )
+        fig_spy.update_yaxes(title_text='Price ($)')
+        add_src(fig_spy, -0.52)
+        st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
+    else:
+        st.info('SPY candlestick data unavailable.')
+
+    st.markdown('#### Altair Cross-Section Views')
+    st.caption('A pair of lighter-weight Altair visuals for quick cross-sectional comparison.')
 
     alt_left, alt_right = st.columns(2)
     with alt_left:
@@ -1558,32 +1587,6 @@ with tab1:
         except Exception:
             st.info('Altair macro chart unavailable.')
 
-    st.divider()
-
-    # ── Sector ETF Holdings & Daily Attribution ────────────────────────────
-    hdr('Sector ETF Holdings & Daily Attribution', TIP_HOLDINGS)
-    st.caption('Expand any sector to see top holdings, weight, daily return, and contribution (weight x return). Sorted by contribution. Weights are hardcoded and updated biannually -- minor drift expected between updates.')
-
-    ec = st.columns(2)
-    for i, (t, n) in enumerate(SECTORS.items()):
-        with ec[i % 2]:
-            with st.expander(f'**{n}** ({t})'):
-                try:
-                    da, er, il = build_holdings_attr(t, prices)
-                    st2 = 'live' if il else 'static'
-                    if not da.empty:
-                        ex = da['Contribution'].sum()
-                        if pd.notna(er) and abs(er) > 0.001:
-                            st.caption(f'ETF 1D: **{er:+.2f}%** / Top holdings explain: **{ex:+.3f}%** ({ex / er * 100:.0f}%) / {st2}')
-                        else:
-                            er_txt = f'{er:+.2f}%' if pd.notna(er) else 'N/A'
-                            st.caption(f'ETF 1D: **{er_txt}** / {st2}')
-                        st.dataframe(style_attr(da), hide_index=True, use_container_width=True, height=min(35 * len(da) + 38, 340))
-                    else:
-                        st.info('Holdings data unavailable.')
-                except Exception:
-                    st.info('Holdings data unavailable.')
-    st.markdown(SRC_YF, unsafe_allow_html=True)
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
 
