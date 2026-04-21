@@ -987,25 +987,167 @@ The dashboard is meant to be read as a **connected system**. The strongest inter
 
 To demonstrate how to read across tabs, this section walks through what the dashboard showed during the week of March 17-21, 2026, when the Strait of Hormuz crisis escalated and Iranian forces declared the strait closed to all shipping. Brent crude surged past $100/bbl for the first time in four years, and the S&P 500 broke below its 200-day moving average near 6,620, finishing Q1 down roughly 4.3%.
 
+Each step below includes a static chart anchored to that week so the visual always matches the narrative.
+""")
+
+    # ── Snapshot date range constants ──
+    SNAP_END = pd.Timestamp('2026-03-21')
+    SNAP_1M = SNAP_END - pd.DateOffset(months=1)
+    SNAP_3M = SNAP_END - pd.DateOffset(months=3)
+    SNAP_6M = SNAP_END - pd.DateOffset(months=6)
+    SNAP_12M = SNAP_END - pd.DateOffset(months=12)
+
+    # Load data once for all snapshot charts
+    try:
+        snap_prices, snap_volumes = fetch_equity()
+    except Exception:
+        snap_prices, snap_volumes = pd.DataFrame(), pd.DataFrame()
+
+    # ── Step 1: Index Returns ──
+    st.markdown("""
 **Step 1 — U.S. Major Indices (Equities tab).** The index chart showed all four benchmarks turning sharply negative over the 1M window. Russell 2000 underperformed the most, consistent with small-caps bearing the brunt of growth scares. The Dow held up slightly better, reflecting its heavier weighting toward industrials and energy names that benefited from the oil spike.
+""")
+    try:
+        fig_snap_idx = go.Figure()
+        snap_idx_colors = {'SPY': '#1f77b4', 'QQQ': '#ff7f0e', 'IWM': '#2ca02c', 'DIA': '#d62728'}
+        for t, n in INDICES.items():
+            if t in snap_prices.columns:
+                s = snap_prices[t].dropna()
+                s = s[(s.index >= SNAP_1M) & (s.index <= SNAP_END)]
+                if len(s) > 1:
+                    ix = (s / s.iloc[0] - 1) * 100
+                    fig_snap_idx.add_trace(go.Scatter(x=ix.index, y=np.round(ix.values, 2), name=n, mode='lines', line=dict(color=snap_idx_colors.get(t, '#999'), width=2.5)))
+        fig_snap_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
+        fig_snap_idx.update_layout(title='U.S. Major Indices — 1M cumulative return (as of Mar 21, 2026)', template='plotly_white', height=340, yaxis_title='Return (%)', margin=dict(b=80, t=40, l=50, r=30), legend=dict(orientation='h', yanchor='top', y=-0.18, x=0.5, xanchor='center', font=dict(size=11)), dragmode=False)
+        st.plotly_chart(fig_snap_idx, use_container_width=True, config=PCFG)
+    except Exception:
+        st.info('Snapshot chart unavailable.')
 
+    # ── Step 2: Positioning ──
+    st.markdown("""
 **Step 2 — Daily Positioning Feed (Equities tab).** The Macro vs Micro chart spiked above 0.90, signaling that cross-sector dispersion dominated over stock-level moves. This confirmed the sell-off was macro-driven (geopolitical shock) rather than an idiosyncratic earnings event. The Breadth indicator fell, indicating the decline was concentrating in mega-cap growth names rather than spreading evenly. The Cyclical/Defensive ratio dropped sharply as investors rotated out of cyclicals and into safer sectors.
+""")
+    snap_pos_l, snap_pos_r = st.columns(2)
+    with snap_pos_l:
+        try:
+            rr_pct_snap, _ = compute_rotation_ratio(snap_prices)
+            rt_snap = rr_pct_snap[(rr_pct_snap.index >= SNAP_12M) & (rr_pct_snap.index <= SNAP_END)]
+            fig_snap_rot = go.Figure()
+            fig_snap_rot.add_trace(go.Scatter(x=rt_snap.index, y=rt_snap.values, mode='lines', line=dict(color='#1f77b4', width=2), showlegend=False))
+            fig_snap_rot.add_hline(y=0.5, line_dash='dash', line_color='gray')
+            fig_snap_rot.add_hrect(y0=0.25, y1=0.75, fillcolor='gray', opacity=0.08, line_width=0)
+            fig_snap_rot.update_layout(title='Macro vs Micro — 12M (as of Mar 21)', template='plotly_white', height=300, yaxis_title='%-tile', yaxis=dict(range=[0, 1], dtick=0.25), margin=dict(b=50, t=40, l=45, r=25), dragmode=False)
+            st.plotly_chart(fig_snap_rot, use_container_width=True, config=PCFG)
+        except Exception:
+            st.info('Snapshot chart unavailable.')
+    with snap_pos_r:
+        try:
+            cy_snap = snap_prices[list(SECTORS_CYCLICAL.keys())].pct_change().mean(axis=1)
+            de_snap = snap_prices[list(SECTORS_DEFENSIVE.keys())].pct_change().mean(axis=1)
+            ratio_snap = (1 + cy_snap).cumprod() / (1 + de_snap).cumprod()
+            rt2_snap = ratio_snap[(ratio_snap.index >= SNAP_12M) & (ratio_snap.index <= SNAP_END)]
+            ri2_snap = rt2_snap / rt2_snap.iloc[0]
+            fig_snap_cd = go.Figure()
+            fig_snap_cd.add_trace(go.Scatter(x=ri2_snap.index, y=ri2_snap.values, mode='lines', line=dict(color='#2ca02c', width=2), showlegend=False))
+            fig_snap_cd.add_hline(y=1.0, line_dash='dash', line_color='gray')
+            fig_snap_cd.update_layout(title='Cyclical / Defensive — 12M (as of Mar 21)', template='plotly_white', height=300, yaxis_title='Ratio', margin=dict(b=50, t=40, l=45, r=25), dragmode=False)
+            st.plotly_chart(fig_snap_cd, use_container_width=True, config=PCFG)
+        except Exception:
+            st.info('Snapshot chart unavailable.')
 
+    # ── Step 3: Composite ──
+    st.markdown("""
 **Step 3 — Sector Composite Table (Equities tab).** Energy (XLE) surged to the top of the Composite ranking with strongly positive flow z-scores, reflecting the oil price spike. Defensive sectors like Consumer Staples (XLP) and Utilities (XLU) also showed positive or neutral composites. Meanwhile, Info Tech (XLK) and Consumer Discretionary (XLY) fell to the bottom, with negative flow z-scores indicating distribution.
+""")
 
+    # ── Step 4: ETF Flows ──
+    st.markdown("""
 **Step 4 — Individual ETF Flows (Equities tab).** Switching to the 3M window, the flow charts for XLE showed a clear accumulation pattern: rising prices confirmed by positive (green) flow z bars. Tech and discretionary charts showed the opposite: price declines accompanied by red flow bars, suggesting investors were actively reducing exposure rather than passively riding losses.
+""")
 
+    def _snap_flow(t, lbl, snap_start, snap_end):
+        """Build a snapshot flow chart for one ETF."""
+        if snap_prices.empty or snap_volumes.empty or t not in snap_prices.columns or t not in snap_volumes.columns:
+            return None
+        p = snap_prices[t].dropna()
+        p = p[(p.index >= snap_start) & (p.index <= snap_end)]
+        if len(p) < 10:
+            return None
+        pi = (p / p.iloc[0] - 1) * 100
+        fz = compute_flow_proxy_z(snap_prices, snap_volumes, t)
+        if fz.empty:
+            return None
+        fz = fz[(fz.index >= snap_start) & (fz.index <= snap_end)]
+        cm = pi.index.intersection(fz.index)
+        if len(cm) < 5:
+            return None
+        pi, fz = pi.loc[cm], fz.loc[cm]
+        bc = ['#2ca02c' if v >= 0 else '#d62728' for v in fz.values]
+        fig = make_subplots(specs=[[{'secondary_y': True}]])
+        fig.add_trace(go.Bar(x=fz.index, y=fz.values, name='Flow Z', marker_color=bc, opacity=0.35, showlegend=False), secondary_y=True)
+        fig.add_trace(go.Scatter(x=pi.index, y=pi.values, name='Return %', mode='lines', line=dict(color='#1f77b4', width=2.5)), secondary_y=False)
+        fig.add_hline(y=0, line_dash='dash', line_color='gray', line_width=0.8, secondary_y=False)
+        fig.update_layout(title=f'{lbl} ({t}) — 3M (as of Mar 21, 2026)', template='plotly_white', height=300, margin=dict(b=50, t=40, l=50, r=40), showlegend=False, dragmode=False, bargap=0.1)
+        fig.update_yaxes(title_text='Return %', secondary_y=False)
+        fig.update_yaxes(title_text='Flow Z', secondary_y=True, range=[-3.5, 3.5], dtick=1, showgrid=False)
+        return fig
+
+    snap_flow_l, snap_flow_r = st.columns(2)
+    with snap_flow_l:
+        f = _snap_flow('XLE', 'Energy', SNAP_3M, SNAP_END)
+        if f:
+            st.plotly_chart(f, use_container_width=True, config=PCFG)
+        else:
+            st.info('XLE snapshot unavailable.')
+    with snap_flow_r:
+        f = _snap_flow('XLK', 'Info. Tech', SNAP_3M, SNAP_END)
+        if f:
+            st.plotly_chart(f, use_container_width=True, config=PCFG)
+        else:
+            st.info('XLK snapshot unavailable.')
+
+    # ── Step 5: Holdings ──
+    st.markdown("""
 **Step 5 — Holdings Attribution (Equities tab).** Expanding XLE revealed that Exxon (XOM, ~23% weight) and Chevron (CVX, ~16%) together explained the majority of the ETF's daily gains. Expanding XLK showed that despite Apple and Microsoft holding up relatively well, Nvidia and AMD dragged the sector down, consistent with higher-beta semiconductor names leading losses during risk-off episodes.
+""")
 
+    # ── Step 6: Fixed Income ──
+    st.markdown("""
 **Step 6 — Fixed Income & Macro tab.** Treasury yields fell as investors sought safety, with the 10Y dropping and the 2Y-10Y spread steepening. Credit spreads (HY OAS) widened, confirming a broad risk-off move. The CPI and PCE charts showed inflation still above the 2% target, which meant the Fed had limited room to cut rates in response to the shock. The Fed Funds rate held steady, and the yield curve commentary confirmed a steepening trend over the prior three months.
+""")
+    snap_fi_l, snap_fi_r = st.columns(2)
+    with snap_fi_l:
+        try:
+            fig_snap_yld = go.Figure()
+            for sid, lbl, clr in [('DGS2', '2Y', '#1f77b4'), ('DGS10', '10Y', '#ff7f0e'), ('DGS30', '30Y', '#2ca02c')]:
+                s = fetch_fred(sid)
+                s = s[(s.index >= SNAP_6M) & (s.index <= SNAP_END)]
+                fig_snap_yld.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode='lines', line=dict(color=clr, width=2)))
+            fig_snap_yld.update_layout(title='Treasury Yields — 6M (as of Mar 21)', template='plotly_white', height=300, yaxis_title='Yield (%)', margin=dict(b=60, t=40, l=50, r=30), legend=dict(orientation='h', yanchor='top', y=-0.18, x=0.5, xanchor='center', font=dict(size=11)), dragmode=False)
+            st.plotly_chart(fig_snap_yld, use_container_width=True, config=PCFG)
+        except Exception:
+            st.info('Snapshot chart unavailable.')
+    with snap_fi_r:
+        try:
+            fig_snap_cr = go.Figure()
+            for sid, lbl in CREDIT.items():
+                s = fetch_fred(sid)
+                s = s[(s.index >= SNAP_6M) & (s.index <= SNAP_END)] * 100
+                fig_snap_cr.add_trace(go.Scatter(x=s.index, y=s.values, name=lbl, mode='lines'))
+            fig_snap_cr.update_layout(title='Credit Spreads (OAS) — 6M (as of Mar 21)', template='plotly_white', height=300, yaxis_title='bps', margin=dict(b=60, t=40, l=50, r=30), legend=dict(orientation='h', yanchor='top', y=-0.18, x=0.5, xanchor='center', font=dict(size=11)), dragmode=False)
+            st.plotly_chart(fig_snap_cr, use_container_width=True, config=PCFG)
+        except Exception:
+            st.info('Snapshot chart unavailable.')
 
+    # ── Step 7: Calendar ──
+    st.markdown("""
 **Step 7 — Calendar tab.** The FOMC was scheduled for March 18-19, adding a policy catalyst directly into the sell-off window. The release calendar showed CPI and retail sales prints landing in the same week. This confluence of geopolitical shock, inflation data, and a Fed decision created the conditions for elevated volatility.
 
 **Synthesis.** No single chart told this story. The index chart showed something was wrong. The positioning feed confirmed it was macro-driven and concentrated. The sector table identified who was winning and losing. The flow charts confirmed active reallocation, not just passive drawdowns. The FI tab explained why the Fed was boxed in. And the calendar revealed why that particular week was so volatile. This is how the dashboard is designed to be read: as connected layers that build toward a narrative, not as isolated metrics.
 """)
 
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
-    st.caption("This worked example is anchored to March 17-21, 2026 for illustration purposes. Because the dashboard uses live data, the charts reflect current conditions rather than the snapshot described above. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.")
+    st.caption("This worked example is anchored to March 17-21, 2026 for illustration purposes. The snapshot charts above are frozen to that date window. The live dashboard tabs reflect current conditions. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.")
 
 # ── TAB 1: Equities ───────────────────────────────────────────────────────
 with tab1:
