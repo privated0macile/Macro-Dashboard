@@ -1565,6 +1565,7 @@ with tab1:
                 dragmode=False,
             )
             fig_spy.update_yaxes(title_text='Price ($)')
+            fig_spy.update_xaxes(rangeslider_visible=False)
             add_src(fig_spy, -0.30)
             st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
         else:
