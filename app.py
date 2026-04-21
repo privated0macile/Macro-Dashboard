@@ -175,11 +175,12 @@ def _esc(text):
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
 
 def info(tip):
-    """Return an inline HTML info-icon with hover tooltip."""
+    """Return an inline HTML info-icon with hover tooltip. Use || for a visual line break."""
+    escaped = _esc(tip).replace('||', '<br><br>')
     return (
         f'<span class="info-tip" tabindex="0">'
         f'<span class="info-icon">i</span>'
-        f'<span class="info-box">{_esc(tip)}</span>'
+        f'<span class="info-box">{escaped}</span>'
         f'</span>'
     )
 
@@ -225,7 +226,7 @@ TIP_COMPOSITE = (
     "(2) Signed Volume Z = volume weighted by price direction vs 1Y mean/std, "
     "(3) Return Z = latest daily return vs 1Y mean/std. "
     "Composite = simple average of all three, clipped at +/-3. "
-    "| HOW TO READ: Ranks sectors from strongest to weakest positioning. "
+    "|| HOW TO READ: Ranks sectors from strongest to weakest positioning. "
     "Green/positive = bullish signals (accumulation, above-average returns). "
     "Red/negative = bearish signals (distribution, below-average returns)."
 )
@@ -245,14 +246,14 @@ TIP_MACRO_MICRO = (
     "CALCULATION: Between-sector dispersion (std of daily sector returns) is divided by "
     "within-sector dispersion (avg absolute gap between cap-weight and equal-weight sector ETF returns), "
     "smoothed over 21 days, then converted to a 252-day percentile rank (0 to 1). "
-    "| HOW TO READ: Above 0.75 means sector-level macro forces are driving the market. "
+    "|| HOW TO READ: Above 0.75 means sector-level macro forces are driving the market. "
     "Below 0.25 means individual stock moves dominate. "
     "Spikes during geopolitical or policy shocks confirm macro-driven regimes."
 )
 TIP_BREADTH = (
     "CALCULATION: RSP (equal-weight S&P 500 ETF) price divided by SPY (cap-weight S&P 500 ETF), "
     "indexed to 1.0 at the start of the selected regime window. "
-    "| HOW TO READ: A rising line means gains are spread across many stocks (healthy breadth). "
+    "|| HOW TO READ: A rising line means gains are spread across many stocks (healthy breadth). "
     "A falling line means a few large-cap names are driving the index while most stocks lag. "
     "Sustained declines often precede broader market weakness."
 )
@@ -260,28 +261,28 @@ TIP_CYC_DEF = (
     "CALCULATION: Equal-weight average daily return of cyclical sectors (Tech, Financials, Energy, "
     "Industrials, Materials, Comm Services, Cons Discretionary) compounded cumulatively, divided by "
     "the same for defensive sectors (Utilities, Healthcare, Staples, Real Estate), indexed to 1.0. "
-    "| HOW TO READ: Rising = investors favor growth and risk (cyclicals outperforming). "
+    "|| HOW TO READ: Rising = investors favor growth and risk (cyclicals outperforming). "
     "Falling = investors seek safety (defensives outperforming). "
     "Sharp drops during sell-offs confirm risk-off rotation."
 )
 TIP_SPY_VOL = (
     "CALCULATION: SPY daily volume minus its trailing 1-year median, divided by "
     "the 1-year standard deviation, clipped at +/-3. Displayed over a 3-month window. "
-    "| HOW TO READ: 0 = normal volume day. Above +2 = unusually heavy trading. "
+    "|| HOW TO READ: 0 = normal volume day. Above +2 = unusually heavy trading. "
     "Below -2 = unusually light. Volume spikes often accompany major news events, "
     "options expiration, or capitulation moves."
 )
 TIP_RELATIVE = (
     "CALCULATION: Each ETF's closing price divided by SPY's closing price daily, "
     "then indexed to 1.0 at the start of the chosen period. "
-    "| HOW TO READ: A rising line means the ETF is outperforming the S&P 500. "
+    "|| HOW TO READ: A rising line means the ETF is outperforming the S&P 500. "
     "A falling line means it is lagging. Crossing below 1.0 means net underperformance "
     "since the start date. Useful for spotting leadership rotation."
 )
 TIP_ALPHA = (
     "CALCULATION: Rolling 126-day (6-month) compounded relative return of each ETF vs SPY. "
     "Computed as the product of (1 + daily relative return) over the trailing window, minus 1. "
-    "| HOW TO READ: Positive = the ETF has outperformed SPY over the past 6 months. "
+    "|| HOW TO READ: Positive = the ETF has outperformed SPY over the past 6 months. "
     "Negative = underperformed. Sustained positive alpha signals durable leadership; "
     "a reversal from positive to negative often marks the end of a trend."
 )
@@ -289,7 +290,7 @@ TIP_FLOW_SECTION = (
     "CALCULATION: Flow proxy = change in dollar volume minus the portion explained by price movement, "
     "z-scored against its own 252-day rolling mean and std, clipped at +/-3. "
     "This isolates volume changes not attributable to price returns as a proxy for fund flows. "
-    "| HOW TO READ: Green bars = positive flow z (accumulation, money flowing in). "
+    "|| HOW TO READ: Green bars = positive flow z (accumulation, money flowing in). "
     "Red bars = negative flow z (distribution, money flowing out). "
     "The blue line shows cumulative price return from the window start. "
     "Prices rising with green bars = confirmed trend. Prices rising with red bars = weaker conviction."
