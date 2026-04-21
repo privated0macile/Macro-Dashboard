@@ -983,6 +983,13 @@ with tab0:
 ### About This Dashboard
 This dashboard connects macroeconomic conditions with equity market behavior using data from **FRED** and **Yahoo Finance**. It is designed to help users interpret how inflation, interest rates, growth expectations, market breadth, and ETF positioning interact -- rather than viewing each signal in isolation.
 
+### Data Overview
+The dashboard pulls from two primary sources: the [Federal Reserve Economic Data (FRED) API](https://fred.stlouisfed.org/docs/api/fred/) and [Yahoo Finance](https://finance.yahoo.com/) via the yfinance Python library. The equity dataset covers approximately 2,500 trading days per ticker starting from January 2015, across 30+ tickers including 4 index ETFs, 11 sector ETFs, 6 factor ETFs, equal-weight sector ETFs, and 80+ individual holdings. The FRED dataset includes 15+ macroeconomic series (Treasury yields at 7 maturities, Fed Funds rate, CPI, Core CPI, PCE, Core PCE, unemployment, GDP, credit spreads, and breakeven inflation). Data cleaning includes dropping NaN values, forward-aligning dates across sources, clipping z-scores at +/-3 to prevent outlier distortion, and normalizing yfinance multi-index panel outputs into clean DataFrames.
+
+### References
+- Federal Reserve Economic Data (FRED): [https://fred.stlouisfed.org/](https://fred.stlouisfed.org/)
+- Yahoo Finance market data: [https://finance.yahoo.com/](https://finance.yahoo.com/)
+
 ### How to Use It
 - **Tabs** across the top organize the dashboard into Equities, Fixed Income & Macro, and Calendar views.
 - **Radio buttons and dropdowns** on each tab control the time horizon. Different charts work best at different windows: flow z-scores and candlesticks are most useful at 3-6 months, while yield curves and inflation need 3-5+ years of context.
@@ -1166,6 +1173,16 @@ Each step below includes a static chart anchored to that week so the visual alwa
 
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
     st.caption("This worked example is anchored to March 17-21, 2026 for illustration purposes. The snapshot charts above are frozen to that date window. The live dashboard tabs reflect current conditions. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.")
+
+    st.divider()
+
+    st.markdown("""
+### Findings & Future Work
+
+**What we learned:** The strongest market interpretations come from confluence across multiple signals rather than any single chart. During the March 2026 Strait of Hormuz crisis, no individual indicator was sufficient — but the combination of macro-driven dispersion, narrowing breadth, defensive rotation, energy accumulation, widening credit spreads, and an FOMC meeting in the same week told a clear and actionable story. The dashboard framework demonstrates that connecting price action, positioning, and the macro backdrop produces richer analysis than viewing each in isolation.
+
+**Future improvements:** (1) Replace the flow proxy with actual ETF fund flow data from a provider like EPFR or ICI, which would give more accurate accumulation/distribution signals. (2) Add an options-derived sentiment layer (put/call ratios, implied volatility skew) to complement the volume-based signals. (3) Build a regime classification model that automatically labels the current environment (risk-on, risk-off, transitional) based on the positioning feed inputs. (4) Integrate earnings calendar data alongside the FRED releases to capture the full catalyst picture. (5) Add cross-asset context (dollar index, gold, oil futures) to better capture macro shock transmission.
+""")
 
 # ── TAB 1: Equities ───────────────────────────────────────────────────────
 with tab1:
@@ -1517,7 +1534,7 @@ with tab1:
 
     # ── Additional Visualizations ──────────────────────────────────────────
     st.subheader('Additional Visualizations')
-    st.caption('Supplementary chart types for broader context. The candlestick provides a different encoding of price action, while the Altair views offer a cross-sectional snapshot and macro overlay.')
+    st.caption('Supplementary chart types for broader context. Includes a Plotly candlestick, Altair cross-section views, and a D3.js interactive bar chart.')
 
     hdr('Benchmark Price Action', TIP_CANDLE)
     st.caption('Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.')
@@ -1604,6 +1621,128 @@ with tab1:
                 st.info('Not enough macro data for the Altair line chart.')
         except Exception:
             st.info('Altair macro chart unavailable.')
+
+    # ── D3 Sector Returns Bar Chart ────────────────────────────────────────
+    st.markdown('#### D3 Interactive View')
+    st.caption('A D3.js bar chart showing sorted sector 1-month returns with hover details and click-to-highlight.')
+    try:
+        d3_rows = []
+        for ticker, name in SECTORS.items():
+            if ticker not in prices.columns:
+                continue
+            series = prices[ticker].dropna()
+            if len(series) >= 22:
+                ret_1m = round((series.iloc[-1] / series.iloc[-21] - 1) * 100, 2)
+                d3_rows.append({"ticker": ticker, "name": name, "ret": ret_1m})
+        d3_rows.sort(key=lambda x: x["ret"], reverse=True)
+
+        import json
+        d3_data_json = json.dumps(d3_rows)
+
+        d3_html = f"""
+        <div id="d3-sector-bar" style="width:100%;font-family:Arial,sans-serif;"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+        <script>
+        (function() {{
+            const data = {d3_data_json};
+            const margin = {{top: 30, right: 20, bottom: 50, left: 55}};
+            const width = 700 - margin.left - margin.right;
+            const height = 320 - margin.top - margin.bottom;
+
+            const svg = d3.select("#d3-sector-bar")
+                .append("svg")
+                .attr("viewBox", `0 0 ${{width + margin.left + margin.right}} ${{height + margin.top + margin.bottom}}`)
+                .attr("preserveAspectRatio", "xMidYMid meet")
+                .style("width", "100%")
+                .append("g")
+                .attr("transform", `translate(${{margin.left}},${{margin.top}})`);
+
+            const x = d3.scaleBand()
+                .domain(data.map(d => d.ticker))
+                .range([0, width])
+                .padding(0.25);
+
+            const yMax = d3.max(data, d => Math.abs(d.ret)) * 1.15;
+            const y = d3.scaleLinear()
+                .domain([-yMax, yMax])
+                .range([height, 0]);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${{height}})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")
+                .style("font-size", "10px");
+
+            svg.append("g")
+                .call(d3.axisLeft(y).ticks(6).tickFormat(d => d + "%"))
+                .selectAll("text")
+                .style("font-size", "10px");
+
+            svg.append("line")
+                .attr("x1", 0).attr("x2", width)
+                .attr("y1", y(0)).attr("y2", y(0))
+                .attr("stroke", "#999").attr("stroke-dasharray", "4,3");
+
+            svg.append("text")
+                .attr("x", width / 2).attr("y", -10)
+                .attr("text-anchor", "middle")
+                .style("font-size", "13px").style("font-weight", "bold")
+                .text("Sector 1-Month Returns (sorted)");
+
+            const tooltip = d3.select("#d3-sector-bar")
+                .append("div")
+                .style("position", "absolute")
+                .style("background", "#2b2b2b")
+                .style("color", "#eee")
+                .style("padding", "6px 10px")
+                .style("border-radius", "5px")
+                .style("font-size", "12px")
+                .style("pointer-events", "none")
+                .style("opacity", 0);
+
+            svg.selectAll(".bar")
+                .data(data)
+                .join("rect")
+                .attr("class", "bar")
+                .attr("x", d => x(d.ticker))
+                .attr("width", x.bandwidth())
+                .attr("y", d => d.ret >= 0 ? y(d.ret) : y(0))
+                .attr("height", d => Math.abs(y(d.ret) - y(0)))
+                .attr("fill", d => d.ret >= 0 ? "#2ca02c" : "#d62728")
+                .attr("opacity", 0.8)
+                .attr("rx", 2)
+                .style("cursor", "pointer")
+                .on("mouseover", function(event, d) {{
+                    d3.select(this).attr("opacity", 1).attr("stroke", "#333").attr("stroke-width", 1.5);
+                    tooltip.style("opacity", 1)
+                        .html("<b>" + d.name + "</b> (" + d.ticker + ")<br>1M: " + (d.ret > 0 ? "+" : "") + d.ret + "%")
+                        .style("left", (event.offsetX + 10) + "px")
+                        .style("top", (event.offsetY - 30) + "px");
+                }})
+                .on("mouseout", function() {{
+                    d3.select(this).attr("opacity", 0.8).attr("stroke", "none");
+                    tooltip.style("opacity", 0);
+                }})
+                .on("click", function(event, d) {{
+                    svg.selectAll(".bar").attr("opacity", 0.3);
+                    d3.select(this).attr("opacity", 1);
+                }});
+
+            svg.on("dblclick", function() {{
+                svg.selectAll(".bar").attr("opacity", 0.8);
+            }});
+
+            svg.append("text")
+                .attr("x", width).attr("y", height + 40)
+                .attr("text-anchor", "end")
+                .style("font-size", "9px").style("fill", "#888")
+                .text("Source: Yahoo Finance, data as of {LAST_TRADE_STR} | Built with D3.js");
+        }})();
+        </script>
+        """
+        components.html(d3_html, height=350, scrolling=False)
+    except Exception:
+        st.info('D3 sector chart unavailable.')
 
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
