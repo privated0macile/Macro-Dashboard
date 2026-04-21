@@ -33,8 +33,8 @@ st.markdown("""
         width: 17px;
         height: 17px;
         border-radius: 50%;
-        background: #d8dce3;
-        color: #555;
+        background: #1a73e8;
+        color: #fff;
         font-size: 10px;
         font-weight: 700;
         font-style: italic;
@@ -42,7 +42,7 @@ st.markdown("""
         line-height: 1;
         transition: background 0.15s;
     }
-    .info-tip:hover .info-icon { background: #b0b8c8; }
+    .info-tip:hover .info-icon { background: #1557b0; }
     .info-box {
         visibility: hidden;
         opacity: 0;
@@ -940,7 +940,8 @@ st.markdown(f"""
 st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
   <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. All data reflects the last trading day close ({LAST_TRADE_STR}) and is cached daily.</p>
-  <p style="margin:0;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Every chart includes a short caption describing what it shows, why it matters, and the data source.</p>
+  <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Hover over the <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#1a73e8;color:#fff;font-size:9px;font-weight:700;font-style:italic;font-family:Georgia,serif;vertical-align:middle">i</span> icons next to each chart title for definitions and reading guides.</p>
+  <p style="margin:0;font-size:0.85rem;color:#555">See the <strong>Introduction</strong> tab for a worked interpretation example and the <strong>Conclusion</strong> tab for a current-date snapshot analysis.</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1077,6 +1078,34 @@ The app is organized around several linked layers:
 
 ### Intro Takeaway
 The dashboard is intended to be read as a **connected system**. Price action, sector leadership, flows, yields, inflation, and policy all reinforce or challenge one another. The strongest signals usually come from **confluence across multiple sections**, not from a single chart alone.
+""")
+
+    st.divider()
+
+    st.markdown("""
+### Worked Example: Reading the Dashboard During the March 2026 Sell-Off
+
+To illustrate how these tabs connect, consider what the dashboard showed during the week of March 17-21, 2026, when the Strait of Hormuz crisis escalated and Iranian forces declared the strait closed to all shipping. Brent crude surged past $100/bbl for the first time in four years, and the S&P 500 broke below its 200-day moving average near 6,620, finishing Q1 down roughly 4.3%.
+
+**Step 1 — U.S. Major Indices (Equities tab).** The index chart showed all four benchmarks turning sharply negative over the 1M window. Russell 2000 underperformed the most, consistent with small-caps bearing the brunt of growth scares. The Dow held up slightly better, reflecting its heavier weighting toward industrials and energy names that benefited from the oil spike.
+
+**Step 2 — Daily Positioning Feed (Equities tab).** The Macro vs Micro chart spiked above 0.90, signaling that cross-sector dispersion dominated over stock-level moves. This confirmed the sell-off was macro-driven (geopolitical shock) rather than an idiosyncratic earnings event. The Breadth indicator fell, indicating the decline was concentrating in mega-cap growth names rather than spreading evenly. The Cyclical/Defensive ratio dropped sharply as investors rotated out of cyclicals and into safer sectors.
+
+**Step 3 — Sector Composite Table (Equities tab).** Energy (XLE) surged to the top of the Composite ranking with strongly positive flow z-scores, reflecting the oil price spike. Defensive sectors like Consumer Staples (XLP) and Utilities (XLU) also showed positive or neutral composites. Meanwhile, Info Tech (XLK) and Consumer Discretionary (XLY) fell to the bottom, with negative flow z-scores indicating distribution.
+
+**Step 4 — Individual ETF Flows (Equities tab).** Switching to the 3M window, the flow charts for XLE showed a clear accumulation pattern: rising prices confirmed by positive (green) flow z bars. Tech and discretionary charts showed the opposite: price declines accompanied by red flow bars, suggesting investors were actively reducing exposure rather than passively riding losses.
+
+**Step 5 — Holdings Attribution (Equities tab).** Expanding XLE revealed that Exxon (XOM, ~23% weight) and Chevron (CVX, ~16%) together explained the majority of the ETF's daily gains. Expanding XLK showed that despite Apple and Microsoft holding up relatively well, Nvidia and AMD dragged the sector down, consistent with higher-beta semiconductor names leading losses during risk-off episodes.
+
+**Step 6 — Fixed Income & Macro tab.** Treasury yields fell as investors sought safety, with the 10Y dropping and the 2Y-10Y spread steepening. Credit spreads (HY OAS) widened, confirming a broad risk-off move. The CPI and PCE charts showed inflation still above the 2% target, which meant the Fed had limited room to cut rates in response to the shock. The Fed Funds rate held steady, and the yield curve commentary confirmed a steepening trend over the prior three months.
+
+**Step 7 — Calendar tab.** The FOMC was scheduled for March 18-19, adding a policy catalyst directly into the sell-off window. The release calendar showed CPI and retail sales prints landing in the same week. This confluence of geopolitical shock, inflation data, and a Fed decision created the conditions for elevated volatility.
+
+**Synthesis.** No single chart told this story. The index chart showed something was wrong. The positioning feed confirmed it was macro-driven and concentrated. The sector table identified who was winning and losing. The flow charts confirmed active reallocation, not just passive drawdowns. The FI tab explained why the Fed was boxed in. And the calendar revealed why that particular week was so volatile. This is how the dashboard is designed to be read: as connected layers that build toward a narrative, not as isolated metrics.
+""")
+
+    st.markdown("""
+*This example is anchored to a specific period for illustration. Because the dashboard uses live data, the charts will reflect current conditions rather than the March 2026 snapshot described above. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.*
 """)
 
 # ── TAB 1: Equities ───────────────────────────────────────────────────────
@@ -1811,6 +1840,13 @@ The most useful signal in this project is not any single chart. Instead, the str
 - market data can be delayed or incomplete
 - short-term readings may reverse quickly without broader confirmation
 
+### Snapshot Interpretation (as of mid-April 2026)
+As of the most recent data, the dashboard reflects an environment still shaped by the Strait of Hormuz crisis that began in early March. The S&P 500 remains below its January highs, with the sell-off concentrated in growth and tech names while energy has significantly outperformed. The Macro vs Micro indicator has stayed elevated, consistent with a market driven by sector-level macro forces rather than stock-specific catalysts. Breadth has narrowed, suggesting the recovery — where it exists — is not broad-based.
+
+On the fixed income side, credit spreads remain wider than their pre-crisis levels, reflecting lingering risk aversion. The yield curve has steepened as the front end priced in the possibility of Fed action, but the Fed held rates steady through the March and January meetings, constrained by inflation that remains above target. Energy-driven cost pressures visible in CPI and PCE readings make rate cuts difficult even as growth expectations soften.
+
+The calendar tab shows FOMC dates continuing through 2026 with no cuts priced into the near term. The combination of elevated oil prices, persistent inflation, narrowing breadth, and defensive sector leadership paints a picture of a market in a cautious, macro-driven regime where the bar for re-risking is high. The strongest signal is the confluence across tabs: positioning, flows, rates, and credit all pointing in the same direction.
+
 ### Final Note
-This dashboard is meant to support interpretation and discussion. Its value comes from helping the user move from isolated observations to a broader market narrative.
+This dashboard is meant to support interpretation and discussion. Its value comes from helping the user move from isolated observations to a broader market narrative. The worked example in the Introduction tab demonstrates how to read across tabs to build a cohesive story. The snapshot above applies the same framework to current conditions.
 """)
