@@ -1536,41 +1536,127 @@ with tab1:
     st.subheader('Additional Visualizations')
     st.caption('Supplementary chart types for broader context. Includes a Plotly candlestick, Altair cross-section views, and a D3.js interactive bar chart.')
 
-    hdr('Benchmark Price Action', TIP_CANDLE)
-    st.caption('Candlestick plot for SPY showing recent price action; hover for OHLC details and use legend controls to isolate series.')
-    spy_window = st.selectbox('SPY candlestick window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
-    spy_start = {
-        '3M': prices.index.max() - pd.DateOffset(months=3),
-        '6M': prices.index.max() - pd.DateOffset(months=6),
-        '1Y': prices.index.max() - pd.DateOffset(years=1),
-        'Since 2015': pd.Timestamp(START),
-    }[spy_window]
-    spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
-    if not spy_ohlc.empty:
-        fig_spy = go.Figure()
-        fig_spy.add_trace(go.Candlestick(
-            x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
-            low=spy_ohlc['Low'], close=spy_ohlc['Close'],
-            increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
-        ))
-        fig_spy.add_trace(go.Scatter(
-            x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
-            mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
-        ))
-        fig_spy.update_layout(
-            title=chart_title('SPY Candlestick', 'Price action with 20-day moving average'),
-            template='plotly_white', height=460, margin=dict(b=160, t=60, l=60, r=40),
-            legend=LEG, dragmode=False,
+    addv_left, addv_right = st.columns(2)
+    with addv_left:
+        hdr('Benchmark Price Action', TIP_CANDLE)
+        spy_window = st.selectbox('SPY window', ['3M', '6M', '1Y', 'Since 2015'], key='spy_window', index=1)
+        spy_start = {
+            '3M': prices.index.max() - pd.DateOffset(months=3),
+            '6M': prices.index.max() - pd.DateOffset(months=6),
+            '1Y': prices.index.max() - pd.DateOffset(years=1),
+            'Since 2015': pd.Timestamp(START),
+        }[spy_window]
+        spy_ohlc = fetch_benchmark_ohlc(start=spy_start.strftime('%Y-%m-%d'))
+        if not spy_ohlc.empty:
+            fig_spy = go.Figure()
+            fig_spy.add_trace(go.Candlestick(
+                x=spy_ohlc.index, open=spy_ohlc['Open'], high=spy_ohlc['High'],
+                low=spy_ohlc['Low'], close=spy_ohlc['Close'],
+                increasing_line_color='#2ca02c', decreasing_line_color='#d62728', name=BENCH,
+            ))
+            fig_spy.add_trace(go.Scatter(
+                x=spy_ohlc.index, y=spy_ohlc['Close'].rolling(20).mean(),
+                mode='lines', line=dict(color='#1f77b4', width=1.8), name='20D MA',
+            ))
+            fig_spy.update_layout(
+                title=chart_title('SPY Candlestick', '20-day MA overlay'),
+                template='plotly_white', height=380, margin=dict(b=100, t=50, l=50, r=30),
+                legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)),
+                dragmode=False,
+            )
+            fig_spy.update_yaxes(title_text='Price ($)')
+            add_src(fig_spy, -0.30)
+            st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
+        else:
+            st.info('SPY candlestick data unavailable.')
+
+    with addv_right:
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:5px">'
+            f'<span style="font-weight:700;font-size:0.9rem">D3: Sector 1M Returns</span>'
+            f'</div>',
+            unsafe_allow_html=True,
         )
-        fig_spy.update_yaxes(title_text='Price ($)')
-        add_src(fig_spy, -0.52)
-        st.plotly_chart(fig_spy, use_container_width=True, key='fig_spy_candle', config=PCFG)
-    else:
-        st.info('SPY candlestick data unavailable.')
+        try:
+            d3_rows = []
+            for ticker, name in SECTORS.items():
+                if ticker not in prices.columns:
+                    continue
+                series = prices[ticker].dropna()
+                if len(series) >= 22:
+                    ret_1m = round((series.iloc[-1] / series.iloc[-21] - 1) * 100, 2)
+                    d3_rows.append({"ticker": ticker, "name": name, "ret": ret_1m})
+            d3_rows.sort(key=lambda x: x["ret"], reverse=True)
+
+            import json
+            d3_data_json = json.dumps(d3_rows)
+
+            d3_html = f"""
+            <div id="d3-sector-bar" style="width:100%;font-family:Arial,sans-serif;"></div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+            <script>
+            (function() {{
+                const data = {d3_data_json};
+                const margin = {{top: 25, right: 15, bottom: 45, left: 45}};
+                const width = 500 - margin.left - margin.right;
+                const height = 300 - margin.top - margin.bottom;
+
+                const svg = d3.select("#d3-sector-bar")
+                    .append("svg")
+                    .attr("viewBox", `0 0 ${{width + margin.left + margin.right}} ${{height + margin.top + margin.bottom}}`)
+                    .attr("preserveAspectRatio", "xMidYMid meet")
+                    .style("width", "100%")
+                    .append("g")
+                    .attr("transform", `translate(${{margin.left}},${{margin.top}})`);
+
+                const x = d3.scaleBand().domain(data.map(d => d.ticker)).range([0, width]).padding(0.25);
+                const yMax = d3.max(data, d => Math.abs(d.ret)) * 1.15;
+                const y = d3.scaleLinear().domain([-yMax, yMax]).range([height, 0]);
+
+                svg.append("g").attr("transform", `translate(0,${{height}})`).call(d3.axisBottom(x)).selectAll("text").style("font-size", "9px");
+                svg.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(d => d + "%")).selectAll("text").style("font-size", "9px");
+                svg.append("line").attr("x1", 0).attr("x2", width).attr("y1", y(0)).attr("y2", y(0)).attr("stroke", "#999").attr("stroke-dasharray", "4,3");
+
+                svg.append("text").attr("x", width / 2).attr("y", -8).attr("text-anchor", "middle").style("font-size", "11px").style("font-weight", "bold").text("Sorted sector 1M returns");
+
+                const tooltip = d3.select("#d3-sector-bar").append("div")
+                    .style("position", "absolute").style("background", "#2b2b2b").style("color", "#eee")
+                    .style("padding", "5px 8px").style("border-radius", "5px").style("font-size", "11px")
+                    .style("pointer-events", "none").style("opacity", 0);
+
+                svg.selectAll(".bar").data(data).join("rect").attr("class", "bar")
+                    .attr("x", d => x(d.ticker)).attr("width", x.bandwidth())
+                    .attr("y", d => d.ret >= 0 ? y(d.ret) : y(0))
+                    .attr("height", d => Math.abs(y(d.ret) - y(0)))
+                    .attr("fill", d => d.ret >= 0 ? "#2ca02c" : "#d62728")
+                    .attr("opacity", 0.8).attr("rx", 2).style("cursor", "pointer")
+                    .on("mouseover", function(event, d) {{
+                        d3.select(this).attr("opacity", 1).attr("stroke", "#333").attr("stroke-width", 1.5);
+                        tooltip.style("opacity", 1)
+                            .html("<b>" + d.name + "</b> (" + d.ticker + ")<br>1M: " + (d.ret > 0 ? "+" : "") + d.ret + "%")
+                            .style("left", (event.offsetX + 10) + "px").style("top", (event.offsetY - 30) + "px");
+                    }})
+                    .on("mouseout", function() {{
+                        d3.select(this).attr("opacity", 0.8).attr("stroke", "none");
+                        tooltip.style("opacity", 0);
+                    }})
+                    .on("click", function(event, d) {{
+                        svg.selectAll(".bar").attr("opacity", 0.3);
+                        d3.select(this).attr("opacity", 1);
+                    }});
+                svg.on("dblclick", function() {{ svg.selectAll(".bar").attr("opacity", 0.8); }});
+
+                svg.append("text").attr("x", width).attr("y", height + 38).attr("text-anchor", "end")
+                    .style("font-size", "8px").style("fill", "#888")
+                    .text("Source: Yahoo Finance, data as of {LAST_TRADE_STR} | D3.js");
+            }})();
+            </script>
+            """
+            components.html(d3_html, height=330, scrolling=False)
+        except Exception:
+            st.info('D3 sector chart unavailable.')
 
     st.markdown('#### Altair Cross-Section Views')
-    st.caption('A pair of lighter-weight Altair visuals for quick cross-sectional comparison.')
-
     alt_left, alt_right = st.columns(2)
     with alt_left:
         try:
@@ -1621,128 +1707,6 @@ with tab1:
                 st.info('Not enough macro data for the Altair line chart.')
         except Exception:
             st.info('Altair macro chart unavailable.')
-
-    # ── D3 Sector Returns Bar Chart ────────────────────────────────────────
-    st.markdown('#### D3 Interactive View')
-    st.caption('A D3.js bar chart showing sorted sector 1-month returns with hover details and click-to-highlight.')
-    try:
-        d3_rows = []
-        for ticker, name in SECTORS.items():
-            if ticker not in prices.columns:
-                continue
-            series = prices[ticker].dropna()
-            if len(series) >= 22:
-                ret_1m = round((series.iloc[-1] / series.iloc[-21] - 1) * 100, 2)
-                d3_rows.append({"ticker": ticker, "name": name, "ret": ret_1m})
-        d3_rows.sort(key=lambda x: x["ret"], reverse=True)
-
-        import json
-        d3_data_json = json.dumps(d3_rows)
-
-        d3_html = f"""
-        <div id="d3-sector-bar" style="width:100%;font-family:Arial,sans-serif;"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-        <script>
-        (function() {{
-            const data = {d3_data_json};
-            const margin = {{top: 30, right: 20, bottom: 50, left: 55}};
-            const width = 700 - margin.left - margin.right;
-            const height = 320 - margin.top - margin.bottom;
-
-            const svg = d3.select("#d3-sector-bar")
-                .append("svg")
-                .attr("viewBox", `0 0 ${{width + margin.left + margin.right}} ${{height + margin.top + margin.bottom}}`)
-                .attr("preserveAspectRatio", "xMidYMid meet")
-                .style("width", "100%")
-                .append("g")
-                .attr("transform", `translate(${{margin.left}},${{margin.top}})`);
-
-            const x = d3.scaleBand()
-                .domain(data.map(d => d.ticker))
-                .range([0, width])
-                .padding(0.25);
-
-            const yMax = d3.max(data, d => Math.abs(d.ret)) * 1.15;
-            const y = d3.scaleLinear()
-                .domain([-yMax, yMax])
-                .range([height, 0]);
-
-            svg.append("g")
-                .attr("transform", `translate(0,${{height}})`)
-                .call(d3.axisBottom(x))
-                .selectAll("text")
-                .style("font-size", "10px");
-
-            svg.append("g")
-                .call(d3.axisLeft(y).ticks(6).tickFormat(d => d + "%"))
-                .selectAll("text")
-                .style("font-size", "10px");
-
-            svg.append("line")
-                .attr("x1", 0).attr("x2", width)
-                .attr("y1", y(0)).attr("y2", y(0))
-                .attr("stroke", "#999").attr("stroke-dasharray", "4,3");
-
-            svg.append("text")
-                .attr("x", width / 2).attr("y", -10)
-                .attr("text-anchor", "middle")
-                .style("font-size", "13px").style("font-weight", "bold")
-                .text("Sector 1-Month Returns (sorted)");
-
-            const tooltip = d3.select("#d3-sector-bar")
-                .append("div")
-                .style("position", "absolute")
-                .style("background", "#2b2b2b")
-                .style("color", "#eee")
-                .style("padding", "6px 10px")
-                .style("border-radius", "5px")
-                .style("font-size", "12px")
-                .style("pointer-events", "none")
-                .style("opacity", 0);
-
-            svg.selectAll(".bar")
-                .data(data)
-                .join("rect")
-                .attr("class", "bar")
-                .attr("x", d => x(d.ticker))
-                .attr("width", x.bandwidth())
-                .attr("y", d => d.ret >= 0 ? y(d.ret) : y(0))
-                .attr("height", d => Math.abs(y(d.ret) - y(0)))
-                .attr("fill", d => d.ret >= 0 ? "#2ca02c" : "#d62728")
-                .attr("opacity", 0.8)
-                .attr("rx", 2)
-                .style("cursor", "pointer")
-                .on("mouseover", function(event, d) {{
-                    d3.select(this).attr("opacity", 1).attr("stroke", "#333").attr("stroke-width", 1.5);
-                    tooltip.style("opacity", 1)
-                        .html("<b>" + d.name + "</b> (" + d.ticker + ")<br>1M: " + (d.ret > 0 ? "+" : "") + d.ret + "%")
-                        .style("left", (event.offsetX + 10) + "px")
-                        .style("top", (event.offsetY - 30) + "px");
-                }})
-                .on("mouseout", function() {{
-                    d3.select(this).attr("opacity", 0.8).attr("stroke", "none");
-                    tooltip.style("opacity", 0);
-                }})
-                .on("click", function(event, d) {{
-                    svg.selectAll(".bar").attr("opacity", 0.3);
-                    d3.select(this).attr("opacity", 1);
-                }});
-
-            svg.on("dblclick", function() {{
-                svg.selectAll(".bar").attr("opacity", 0.8);
-            }});
-
-            svg.append("text")
-                .attr("x", width).attr("y", height + 40)
-                .attr("text-anchor", "end")
-                .style("font-size", "9px").style("fill", "#888")
-                .text("Source: Yahoo Finance, data as of {LAST_TRADE_STR} | Built with D3.js");
-        }})();
-        </script>
-        """
-        components.html(d3_html, height=350, scrolling=False)
-    except Exception:
-        st.info('D3 sector chart unavailable.')
 
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
