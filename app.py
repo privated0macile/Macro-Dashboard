@@ -1276,7 +1276,7 @@ with tab1:
                 fig.add_hrect(y0=0.25, y1=0.75, fillcolor='gray', opacity=0.08, line_width=0)
                 fig.update_layout(
                     title=dict(text=f"<span style='font-size:11px;color:#666'>>0.75 sector-driven / <0.25 stock-driven</span>", font=dict(size=12)),
-                    template='plotly_white', height=380, yaxis_title='%-tile',
+                    template='plotly_white', height=320, yaxis_title='%-tile',
                     yaxis=dict(range=[0, 1], dtick=0.25),
                     margin=dict(b=65, t=35, l=45, r=25), dragmode=False,
                 )
@@ -1302,7 +1302,7 @@ with tab1:
                 fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
                 fig.update_layout(
                     title=dict(text=f"<span style='font-size:11px;color:#666'>RSP/SPY / rising = broadening</span>", font=dict(size=12)),
-                    template='plotly_white', height=380, yaxis_title='Indexed',
+                    template='plotly_white', height=320, yaxis_title='Indexed',
                     margin=dict(b=65, t=35, l=45, r=25), dragmode=False,
                 )
                 add_src(fig, -0.15)
@@ -1326,7 +1326,7 @@ with tab1:
             fig.add_hline(y=1.0, line_dash='dash', line_color='gray')
             fig.update_layout(
                 title=dict(text=f"<span style='font-size:11px;color:#666'>Rising = risk-on / falling = risk-off</span>", font=dict(size=12)),
-                template='plotly_white', height=380, yaxis_title='Ratio',
+                template='plotly_white', height=320, yaxis_title='Ratio',
                 margin=dict(b=65, t=35, l=45, r=25), dragmode=False,
             )
             add_src(fig, -0.15)
@@ -1352,7 +1352,7 @@ with tab1:
             fig.add_hline(y=-2, line_dash='dot', line_color='#d62728', line_width=0.8)
             fig.update_layout(
                 title=dict(text=f"<span style='font-size:11px;color:#666'>0 = 1Y median / 3M window / +/-3</span>", font=dict(size=12)),
-                template='plotly_white', height=380, yaxis_title='Z-Score',
+                template='plotly_white', height=320, yaxis_title='Z-Score',
                 yaxis=dict(range=[-3.5, 3.5], dtick=1),
                 margin=dict(b=65, t=35, l=45, r=25), bargap=0.15, dragmode=False,
             )
@@ -1711,7 +1711,7 @@ with tab2:
 
     st.divider()
 
-    il, ir = st.columns(2)
+    il, ir, el, gl = st.columns(4)
     with il:
         chart_label('CPI & Core CPI', TIP_CPI)
         fig = go.Figure()
@@ -1724,10 +1724,10 @@ with tab2:
         fig.add_hline(y=2.0, line_dash='dash', line_color='red', annotation_text='2%', annotation_position='bottom right')
         fig.update_layout(
             title=dict(text="<span style='font-size:11px;color:#888'>YoY %</span>", font=dict(size=12)),
-            template='plotly_white', height=360, yaxis_title='YoY %',
-            margin=dict(b=110, t=35, l=55, r=30), legend=LEG, dragmode=False,
+            template='plotly_white', height=320, yaxis_title='YoY %',
+            margin=dict(b=65, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.38)
+        add_src(fig, -0.15)
         st.plotly_chart(fig, use_container_width=True, key='fig_cpi', config=PCFG)
 
     with ir:
@@ -1741,14 +1741,13 @@ with tab2:
                 pass
         fig.add_hline(y=2.0, line_dash='dash', line_color='red', annotation_text='2%', annotation_position='bottom right')
         fig.update_layout(
-            title=dict(text="<span style='font-size:11px;color:#888'>YoY % / Fed's preferred gauge</span>", font=dict(size=12)),
-            template='plotly_white', height=360, yaxis_title='YoY %',
-            margin=dict(b=110, t=35, l=55, r=30), legend=LEG, dragmode=False,
+            title=dict(text="<span style='font-size:11px;color:#888'>Fed's preferred gauge</span>", font=dict(size=12)),
+            template='plotly_white', height=320, yaxis_title='YoY %',
+            margin=dict(b=65, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.38)
+        add_src(fig, -0.15)
         st.plotly_chart(fig, use_container_width=True, key='fig_pce', config=PCFG)
 
-    el, gl = st.columns(2)
     with el:
         chart_label('Fed Funds & Unemployment', TIP_FF_UNEMP)
         fig = go.Figure()
@@ -1760,10 +1759,10 @@ with tab2:
                 pass
         fig.update_layout(
             title=dict(text="<span style='font-size:11px;color:#888'>Dual mandate</span>", font=dict(size=12)),
-            template='plotly_white', height=360, yaxis_title='%',
-            margin=dict(b=110, t=35, l=55, r=30), legend=LEG, dragmode=False,
+            template='plotly_white', height=320, yaxis_title='%',
+            margin=dict(b=65, t=35, l=45, r=25), legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=10)), dragmode=False,
         )
-        add_src(fig, -0.38)
+        add_src(fig, -0.15)
         st.plotly_chart(fig, use_container_width=True, key='fig_ff', config=PCFG)
 
     with gl:
@@ -1778,10 +1777,10 @@ with tab2:
             fig.add_hline(y=0, line_color='black', line_width=1)
             fig.update_layout(
                 title=dict(text="<span style='font-size:11px;color:#888'>QoQ annualized %</span>", font=dict(size=12)),
-                template='plotly_white', height=360, yaxis_title='% QoQ Ann.',
-                margin=dict(b=110, t=35, l=55, r=30), legend=LEG, dragmode=False,
+                template='plotly_white', height=320, yaxis_title='% QoQ Ann.',
+                margin=dict(b=65, t=35, l=45, r=25), dragmode=False,
             )
-            add_src(fig, -0.38)
+            add_src(fig, -0.15)
             st.plotly_chart(fig, use_container_width=True, key='fig_gdp', config=PCFG)
         except Exception:
             st.info('GDP data unavailable.')
