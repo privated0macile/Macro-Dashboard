@@ -1180,12 +1180,12 @@ with tab1:
         fig_idx.add_hline(y=0, line_dash='dash', line_color='gray', line_width=1)
         fig_idx.update_layout(
             title=chart_title('U.S. Major Indices', f'{idx_period} cumulative return'),
-            template='plotly_white', height=380, yaxis_title='Return (%)',
+            template='plotly_white', height=420, yaxis_title='Return (%)',
             margin=dict(b=100, t=40, l=50, r=30),
             legend=dict(orientation='h', yanchor='top', y=-0.15, x=0.5, xanchor='center', font=dict(size=11)),
             dragmode=False, font=dict(size=11),
         )
-        add_src(fig_idx, -0.35)
+        add_src(fig_idx, -0.38)
         st.plotly_chart(fig_idx, use_container_width=True, key='fig_idx', config=PCFG)
 
     with hdr_r:
