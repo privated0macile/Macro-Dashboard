@@ -941,11 +941,11 @@ st.markdown(f"""
 <div style="margin:1rem 0 1.5rem;padding:0.9rem 1rem;border-radius:8px;border:1px solid #e6e6e6;background:#fafafa">
   <p style="margin:0 0 0.5rem;font-size:0.95rem;color:#222"><strong>Dashboard overview</strong>: This report combines macroeconomic series from FRED with equity and ETF data from Yahoo Finance. All data reflects the last trading day close ({LAST_TRADE_STR}) and is cached daily.</p>
   <p style="margin:0 0 0.5rem;font-size:0.85rem;color:#555">Use hover details and legend clicks to inspect each series. Hover over the <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#1a73e8;color:#fff;font-size:9px;font-weight:700;font-style:italic;font-family:Georgia,serif;vertical-align:middle">i</span> icons next to each chart title for definitions and reading guides.</p>
-  <p style="margin:0;font-size:0.85rem;color:#555">See the <strong>Introduction</strong> tab for a worked interpretation example and the <strong>Conclusion</strong> tab for a current-date snapshot analysis.</p>
+  <p style="margin:0;font-size:0.85rem;color:#555">See the <strong>Guide & Analysis</strong> tab for a walkthrough of how to interpret the dashboard, including a worked example.</p>
 </div>
 """, unsafe_allow_html=True)
 
-tab0, tab1, tab2, tab3, tab4 = st.tabs(['Introduction', 'Equities', 'Fixed Income & Macro', 'Calendar', 'Conclusion'])
+tab0, tab1, tab2, tab3 = st.tabs(['Guide & Analysis', 'Equities', 'Fixed Income & Macro', 'Calendar'])
 
 # Default to Equities tab on first load
 if 'tab_init' not in st.session_state:
@@ -957,127 +957,27 @@ if 'tab_init' not in st.session_state:
     </script>
     """, height=0)
 
-# ── TAB 0: Introduction ───────────────────────────────────────────────────
+# ── TAB 0: Guide & Analysis ────────────────────────────────────────────────
 with tab0:
-    st.title("Introduction")
+    st.title("Guide & Analysis")
 
     st.markdown("""
-### Project Overview
-This dashboard connects **macroeconomic conditions** with **equity market behavior** using data from **FRED** and **Yahoo Finance**. The goal is to help users interpret how inflation, interest rates, growth expectations, breadth, and ETF positioning interact rather than looking at each signal in isolation.
+### About This Dashboard
+This dashboard connects macroeconomic conditions with equity market behavior using data from **FRED** and **Yahoo Finance**. It is designed to help users interpret how inflation, interest rates, growth expectations, market breadth, and ETF positioning interact -- rather than viewing each signal in isolation.
 
-The app is organized around several linked layers:
-- broad U.S. index performance
-- sector and factor leadership
-- ETF flow and positioning signals
-- fixed income and macro context
-- calendar timing through releases and FOMC dates
+### How to Use It
+- **Tabs** across the top organize the dashboard into Equities, Fixed Income & Macro, and Calendar views.
+- **Radio buttons and dropdowns** on each tab control the time horizon. Different charts work best at different windows: flow z-scores and candlesticks are most useful at 3-6 months, while yield curves and inflation need 3-5+ years of context.
+- **Hover** over any chart for exact values. **Click legend items** to isolate or hide individual series.
+- **Blue ⓘ icons** next to each chart title contain definitions and reading guides. Hover over them for a quick explanation of what each visualization shows and how to interpret it.
+- **Expanders** in the Holdings section let you drill into individual stocks within each sector ETF.
 
-### How to Use the Dashboard
-- Navigate with the tabs across the top
-- Use radio buttons and dropdowns to adjust the time horizon
-- Hover over charts for exact values
-- Click legend items on interactive charts to isolate series
+### What Each Tab Covers
+- **Equities**: index returns, market breadth, sector/factor relative performance, ETF flow proxies, and holdings-level attribution.
+- **Fixed Income & Macro**: Treasury yields, yield curve shape, credit spreads, inflation (CPI/PCE), Fed Funds, unemployment, and GDP growth.
+- **Calendar**: upcoming and recent FRED data releases, and FOMC meeting dates with outcomes and countdowns.
 
-### Main Questions This Dashboard Helps Answer
-- Is the market broad or concentrated?
-- Are sectors and factors seeing accumulation or distribution?
-- What macro conditions are supporting or challenging risk appetite?
-- When are the next important economic and policy catalysts?
-""")
-
-    st.divider()
-
-    st.subheader("Quick Preview")
-    st.caption("These two visuals introduce the dashboard by showing a short-term market snapshot and a cross-sectional sector heatmap.")
-
-    intro_left, intro_right = st.columns(2)
-
-    with intro_left:
-        st.markdown("**SPY Candlestick Preview**")
-        st.caption("Interactive instructions: hover for OHLC details and use the moving-average legend to isolate the line. Takeaway: candlesticks help show short-term trend direction, reversal behavior, and recent volatility in the broad market.")
-
-        try:
-            intro_ohlc = fetch_benchmark_ohlc(
-                start=(pd.Timestamp.today() - pd.DateOffset(months=3)).strftime("%Y-%m-%d")
-            )
-
-            if not intro_ohlc.empty:
-                fig_intro_candle = go.Figure()
-                fig_intro_candle.add_trace(go.Candlestick(
-                    x=intro_ohlc.index,
-                    open=intro_ohlc["Open"], high=intro_ohlc["High"],
-                    low=intro_ohlc["Low"], close=intro_ohlc["Close"],
-                    increasing_line_color="#2ca02c", decreasing_line_color="#d62728",
-                    name="SPY"
-                ))
-                fig_intro_candle.add_trace(go.Scatter(
-                    x=intro_ohlc.index,
-                    y=intro_ohlc["Close"].rolling(20).mean(),
-                    mode="lines", line=dict(color="#1f77b4", width=1.8), name="20D MA"
-                ))
-                fig_intro_candle.update_layout(
-                    title=chart_title("SPY Preview", "Recent candlestick view"),
-                    template="plotly_white", height=360,
-                    margin=dict(b=65, t=55, l=55, r=35),
-                    legend=dict(orientation="h", yanchor="top", y=-0.15, x=0.5, xanchor="center", font=dict(size=11)),
-                    dragmode=False
-                )
-                fig_intro_candle.update_yaxes(title_text="Price ($)")
-                add_src(fig_intro_candle, -0.38)
-                st.plotly_chart(fig_intro_candle, use_container_width=True, config=PCFG)
-            else:
-                st.info("Intro candlestick preview unavailable.")
-        except Exception:
-            st.info("Intro candlestick preview unavailable.")
-
-    with intro_right:
-        st.markdown("**Sector Heatmap Preview**")
-        st.caption("Interactive instructions: hover over each cell to compare 5-day and 1-month returns across sectors. Takeaway: the heatmap quickly shows which sectors are leading, lagging, or diverging across short-term horizons.")
-
-        try:
-            prices_intro, _ = fetch_equity()
-            sector_rows_intro = []
-            for ticker, name in SECTORS.items():
-                if ticker not in prices_intro.columns:
-                    continue
-                series = prices_intro[ticker].dropna()
-                if len(series) < 22:
-                    continue
-                ret_1m = (series.iloc[-1] / series.iloc[-21] - 1) * 100
-                ret_5d = (series.iloc[-1] / series.iloc[-5] - 1) * 100 if len(series) >= 5 else np.nan
-                sector_rows_intro.append({
-                    "Ticker": ticker, "Sector": name,
-                    "1M Return": round(ret_1m, 2),
-                    "5D Return": round(ret_5d, 2) if pd.notna(ret_5d) else np.nan
-                })
-            intro_heat_df = pd.DataFrame(sector_rows_intro)
-            if not intro_heat_df.empty:
-                intro_heat = (
-                    alt.Chart(intro_heat_df).mark_rect(cornerRadius=4).encode(
-                        x=alt.X("Ticker:N", sort=list(SECTORS.keys()), title=None),
-                        y=alt.Y("Metric:N", title=None),
-                        color=alt.Color("Value:Q", scale=alt.Scale(scheme="redyellowgreen"), title="Return %"),
-                        tooltip=["Sector:N", "Ticker:N", "Metric:N", alt.Tooltip("Value:Q", format=".2f")]
-                    ).transform_fold(["1M Return", "5D Return"], as_=["Metric", "Value"])
-                    .properties(height=220, title="Sector return heatmap preview")
-                )
-                st.altair_chart(intro_heat, use_container_width=True)
-                st.markdown(SRC_BOTH, unsafe_allow_html=True)
-            else:
-                st.info("Intro heatmap preview unavailable.")
-        except Exception:
-            st.info("Intro heatmap preview unavailable.")
-
-    st.divider()
-
-    st.markdown("""
-### How to Read the Rest of the Dashboard
-- The **Equities** tab focuses on index behavior, breadth, relative performance, ETF flows, and holdings attribution.
-- The **Fixed Income & Macro** tab provides the policy and economic backdrop through yields, spreads, inflation, and growth.
-- The **Calendar** tab adds timing context through recent and upcoming macro releases and FOMC dates.
-
-### Intro Takeaway
-The dashboard is intended to be read as a **connected system**. Price action, sector leadership, flows, yields, inflation, and policy all reinforce or challenge one another. The strongest signals usually come from **confluence across multiple sections**, not from a single chart alone.
+The dashboard is meant to be read as a **connected system**. The strongest interpretive signals come from confluence across multiple sections, not from any single chart.
 """)
 
     st.divider()
@@ -1085,7 +985,7 @@ The dashboard is intended to be read as a **connected system**. Price action, se
     st.markdown("""
 ### Worked Example: Reading the Dashboard During the March 2026 Sell-Off
 
-To illustrate how these tabs connect, consider what the dashboard showed during the week of March 17-21, 2026, when the Strait of Hormuz crisis escalated and Iranian forces declared the strait closed to all shipping. Brent crude surged past $100/bbl for the first time in four years, and the S&P 500 broke below its 200-day moving average near 6,620, finishing Q1 down roughly 4.3%.
+To demonstrate how to read across tabs, this section walks through what the dashboard showed during the week of March 17-21, 2026, when the Strait of Hormuz crisis escalated and Iranian forces declared the strait closed to all shipping. Brent crude surged past $100/bbl for the first time in four years, and the S&P 500 broke below its 200-day moving average near 6,620, finishing Q1 down roughly 4.3%.
 
 **Step 1 — U.S. Major Indices (Equities tab).** The index chart showed all four benchmarks turning sharply negative over the 1M window. Russell 2000 underperformed the most, consistent with small-caps bearing the brunt of growth scares. The Dow held up slightly better, reflecting its heavier weighting toward industrials and energy names that benefited from the oil spike.
 
@@ -1104,9 +1004,8 @@ To illustrate how these tabs connect, consider what the dashboard showed during 
 **Synthesis.** No single chart told this story. The index chart showed something was wrong. The positioning feed confirmed it was macro-driven and concentrated. The sector table identified who was winning and losing. The flow charts confirmed active reallocation, not just passive drawdowns. The FI tab explained why the Fed was boxed in. And the calendar revealed why that particular week was so volatile. This is how the dashboard is designed to be read: as connected layers that build toward a narrative, not as isolated metrics.
 """)
 
-    st.markdown("""
-*This example is anchored to a specific period for illustration. Because the dashboard uses live data, the charts will reflect current conditions rather than the March 2026 snapshot described above. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.*
-""")
+    st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
+    st.caption("This worked example is anchored to March 17-21, 2026 for illustration purposes. Because the dashboard uses live data, the charts reflect current conditions rather than the snapshot described above. The analytical framework — moving from indices to positioning to sectors to flows to macro to catalysts — applies regardless of the date.")
 
 # ── TAB 1: Equities ───────────────────────────────────────────────────────
 with tab1:
@@ -1809,44 +1708,3 @@ with tab3:
 
     st.divider()
     st.markdown(f'<p style="color:#999;font-size:0.75rem;font-style:italic">{DISCLAIMER}</p>', unsafe_allow_html=True)
-
-# ── TAB 4: Conclusion ─────────────────────────────────────────────────────
-with tab4:
-    st.title("Conclusion")
-
-    st.markdown("""
-### Final Conclusions
-This dashboard suggests that market interpretation is strongest when **price action**, **positioning**, and the **macro backdrop** are read together rather than in isolation.
-
-### Main Lessons from the Dashboard
-- **Breadth** helps distinguish healthy market participation from narrow concentration.
-- **Sector and factor relative performance** show where leadership is rotating.
-- **Flow z-scores** offer a proxy for accumulation versus distribution.
-- **Yield curves, spreads, inflation, and Fed policy** provide the macro explanation for shifts in risk appetite.
-- **Calendar timing** matters because macro releases and Fed meetings often act as catalysts for repricing.
-
-### Interaction Guidance
-- Use the **Equities** tab to compare leadership and positioning across sectors and factors.
-- Use the **Fixed Income & Macro** tab to connect market moves to rates, inflation, and economic growth.
-- Use the **Calendar** tab to identify upcoming events that may influence these trends.
-
-### Overall Takeaway
-The most useful signal in this project is not any single chart. Instead, the strongest interpretation comes from **confluence**:
-- broad participation plus positive flows plus supportive macro conditions suggests a healthier backdrop
-- narrowing breadth, defensive leadership, and wider spreads suggest a more cautious environment
-
-### Limitations
-- ETF flows here are proxies rather than exact fund flow data
-- market data can be delayed or incomplete
-- short-term readings may reverse quickly without broader confirmation
-
-### Snapshot Interpretation (as of mid-April 2026)
-As of the most recent data, the dashboard reflects an environment still shaped by the Strait of Hormuz crisis that began in early March. The S&P 500 remains below its January highs, with the sell-off concentrated in growth and tech names while energy has significantly outperformed. The Macro vs Micro indicator has stayed elevated, consistent with a market driven by sector-level macro forces rather than stock-specific catalysts. Breadth has narrowed, suggesting the recovery — where it exists — is not broad-based.
-
-On the fixed income side, credit spreads remain wider than their pre-crisis levels, reflecting lingering risk aversion. The yield curve has steepened as the front end priced in the possibility of Fed action, but the Fed held rates steady through the March and January meetings, constrained by inflation that remains above target. Energy-driven cost pressures visible in CPI and PCE readings make rate cuts difficult even as growth expectations soften.
-
-The calendar tab shows FOMC dates continuing through 2026 with no cuts priced into the near term. The combination of elevated oil prices, persistent inflation, narrowing breadth, and defensive sector leadership paints a picture of a market in a cautious, macro-driven regime where the bar for re-risking is high. The strongest signal is the confluence across tabs: positioning, flows, rates, and credit all pointing in the same direction.
-
-### Final Note
-This dashboard is meant to support interpretation and discussion. Its value comes from helping the user move from isolated observations to a broader market narrative. The worked example in the Introduction tab demonstrates how to read across tabs to build a cohesive story. The snapshot above applies the same framework to current conditions.
-""")
