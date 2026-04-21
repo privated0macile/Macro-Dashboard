@@ -220,11 +220,14 @@ TIP_INDICES = (
     "A rising line means the index has gained value over the chosen period."
 )
 TIP_COMPOSITE = (
-    "Ranks sectors by a Composite score that blends three signals: "
-    "Flow Z (are investors putting money in or pulling it out?), "
-    "Signed Volume Z (is trading volume heavier on up-days or down-days?), "
-    "and Return Z (how unusual is the latest daily move vs the past year?). "
-    "Green/positive = bullish signals; red/negative = bearish signals."
+    "CALCULATION: For each sector ETF, three 252-day rolling z-scores are computed: "
+    "(1) Flow Z = dollar-volume flow proxy vs its 1Y mean/std, "
+    "(2) Signed Volume Z = volume weighted by price direction vs 1Y mean/std, "
+    "(3) Return Z = latest daily return vs 1Y mean/std. "
+    "Composite = simple average of all three, clipped at +/-3. "
+    "| HOW TO READ: Ranks sectors from strongest to weakest positioning. "
+    "Green/positive = bullish signals (accumulation, above-average returns). "
+    "Red/negative = bearish signals (distribution, below-average returns)."
 )
 TIP_CANDLE = (
     "A candlestick chart shows each day's open, high, low, and close price. "
@@ -239,43 +242,57 @@ TIP_POSITIONING = (
     "favor riskier or safer sectors, and whether trading volume is unusually high or low."
 )
 TIP_MACRO_MICRO = (
-    "Compares how much sectors move relative to each other (macro) versus "
-    "how much individual stocks diverge within each sector (micro). "
-    "Above 0.75 means sector bets dominate; below 0.25 means stock-pickers "
-    "are driving returns. Measured as a percentile rank over the past year."
+    "CALCULATION: Between-sector dispersion (std of daily sector returns) is divided by "
+    "within-sector dispersion (avg absolute gap between cap-weight and equal-weight sector ETF returns), "
+    "smoothed over 21 days, then converted to a 252-day percentile rank (0 to 1). "
+    "| HOW TO READ: Above 0.75 means sector-level macro forces are driving the market. "
+    "Below 0.25 means individual stock moves dominate. "
+    "Spikes during geopolitical or policy shocks confirm macro-driven regimes."
 )
 TIP_BREADTH = (
-    "Compares the equal-weight S&P 500 (RSP, every stock counts the same) "
-    "to the cap-weight S&P 500 (SPY, bigger companies count more). "
-    "A rising line means gains are spread across many stocks (healthy). "
-    "A falling line means only a few large stocks are driving the index."
+    "CALCULATION: RSP (equal-weight S&P 500 ETF) price divided by SPY (cap-weight S&P 500 ETF), "
+    "indexed to 1.0 at the start of the selected regime window. "
+    "| HOW TO READ: A rising line means gains are spread across many stocks (healthy breadth). "
+    "A falling line means a few large-cap names are driving the index while most stocks lag. "
+    "Sustained declines often precede broader market weakness."
 )
 TIP_CYC_DEF = (
-    "Tracks cyclical sectors (tech, financials, energy, industrials -- "
-    "these do well when the economy grows) versus defensive sectors "
-    "(utilities, healthcare, staples -- these hold up in downturns). "
-    "Rising = investors favor growth and risk. Falling = investors seek safety."
+    "CALCULATION: Equal-weight average daily return of cyclical sectors (Tech, Financials, Energy, "
+    "Industrials, Materials, Comm Services, Cons Discretionary) compounded cumulatively, divided by "
+    "the same for defensive sectors (Utilities, Healthcare, Staples, Real Estate), indexed to 1.0. "
+    "| HOW TO READ: Rising = investors favor growth and risk (cyclicals outperforming). "
+    "Falling = investors seek safety (defensives outperforming). "
+    "Sharp drops during sell-offs confirm risk-off rotation."
 )
 TIP_SPY_VOL = (
-    "Shows today's SPY trading volume compared to its one-year median, "
-    "expressed as a z-score. 0 = normal volume, +2 = very heavy, -2 = very light. "
-    "Spikes often accompany big market moves or news events."
+    "CALCULATION: SPY daily volume minus its trailing 1-year median, divided by "
+    "the 1-year standard deviation, clipped at +/-3. Displayed over a 3-month window. "
+    "| HOW TO READ: 0 = normal volume day. Above +2 = unusually heavy trading. "
+    "Below -2 = unusually light. Volume spikes often accompany major news events, "
+    "options expiration, or capitulation moves."
 )
 TIP_RELATIVE = (
-    "Each line shows how an ETF has performed relative to SPY (the S&P 500). "
-    "A rising line means that ETF is beating the broad market; falling means "
-    "it is lagging. Indexed to 1.0 at the start of the chosen period."
+    "CALCULATION: Each ETF's closing price divided by SPY's closing price daily, "
+    "then indexed to 1.0 at the start of the chosen period. "
+    "| HOW TO READ: A rising line means the ETF is outperforming the S&P 500. "
+    "A falling line means it is lagging. Crossing below 1.0 means net underperformance "
+    "since the start date. Useful for spotting leadership rotation."
 )
 TIP_ALPHA = (
-    "Rolling 6-month alpha measures an ETF's compounded outperformance "
-    "versus SPY over a trailing half-year window. Positive = outperforming, "
-    "negative = underperforming. Useful for spotting sustained trends."
+    "CALCULATION: Rolling 126-day (6-month) compounded relative return of each ETF vs SPY. "
+    "Computed as the product of (1 + daily relative return) over the trailing window, minus 1. "
+    "| HOW TO READ: Positive = the ETF has outperformed SPY over the past 6 months. "
+    "Negative = underperformed. Sustained positive alpha signals durable leadership; "
+    "a reversal from positive to negative often marks the end of a trend."
 )
 TIP_FLOW_SECTION = (
-    "Each chart overlays an ETF's price return (blue line) with a flow z-score "
-    "(green/red bars). The flow proxy estimates whether money is flowing into "
-    "(green, accumulation) or out of (red, distribution) the ETF, based on "
-    "price and volume patterns over the past year."
+    "CALCULATION: Flow proxy = change in dollar volume minus the portion explained by price movement, "
+    "z-scored against its own 252-day rolling mean and std, clipped at +/-3. "
+    "This isolates volume changes not attributable to price returns as a proxy for fund flows. "
+    "| HOW TO READ: Green bars = positive flow z (accumulation, money flowing in). "
+    "Red bars = negative flow z (distribution, money flowing out). "
+    "The blue line shows cumulative price return from the window start. "
+    "Prices rising with green bars = confirmed trend. Prices rising with red bars = weaker conviction."
 )
 TIP_HEATMAP = (
     "A color grid showing each sector's return over two windows: "
